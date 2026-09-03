@@ -41,12 +41,27 @@ test('No logged HTML, event handlers, embedded media, forms, or clobbering IDs',
   assert.match(node.textContent, /Attachment: Secret/);
 });
 
-test('Only deliberate safe external links survive; dangerous and relative URLs are inert', t => {
+test('Link destinations stay visible while only safe external URLs are clickable', t => {
   const {render} = setup(t);
   const node = render('[Safe](https://example.com/docs) [Mail](mailto:person@example.com) [JS](javascript:alert%281%29) [Data](data:text/html,test) [Relative](/logs/api/entries) [Protocol-relative](//evil.example/pixel) [Encoded](javascript&#58;alert%281%29)');
   const links = [...node.querySelectorAll('a[href]')];
   assert.deepEqual(links.map(a => a.getAttribute('href')), ['https://example.com/docs','mailto:person@example.com']);
   assert.ok(links.every(a => a.target === '_blank' && a.rel === 'noopener noreferrer'));
+  const targets = [...node.querySelectorAll('.link-target')].map(target => target.textContent);
+  assert.equal(targets.length, 7);
+  assert.ok(targets.some(target => target.includes('/logs/api/entries')));
+  assert.ok(targets.some(target => target.includes('javascript:')));
+  assert.equal(node.querySelectorAll('a:not([href])').length, 5);
+});
+
+test('Relative Markdown file links render both their label and path', t => {
+  const {render} = setup(t);
+  const node = render('- [System Paths & Device Files](./memories/system-paths-device-files.md)');
+  const item = node.querySelector('li');
+  assert.match(item.textContent, /System Paths & Device Files/);
+  assert.match(item.textContent, /\.\/memories\/system-paths-device-files\.md/);
+  assert.equal(item.querySelector('a').hasAttribute('href'), false);
+  assert.equal(item.querySelector('.link-target').textContent, ' (./memories/system-paths-device-files.md)');
 });
 
 test('Sanitizer failure falls back to literal text', t => {

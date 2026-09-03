@@ -8,7 +8,13 @@
       breaks:false,
       renderer:{
         html:({text}) => escape(text),
-        image:({text}) => '<span class="attachment-placeholder">[Attachment: ' + escape(text || 'image') + ' — not loaded]</span>'
+        image:({text}) => '<span class="attachment-placeholder">[Attachment: ' + escape(text || 'image') + ' — not loaded]</span>',
+        link({href, title, tokens}) {
+          const target = String(href || '');
+          const titleAttribute = title ? ' title="' + escape(title) + '"' : '';
+          return '<a href="' + escape(target) + '"' + titleAttribute + '>' + this.parser.parseInline(tokens) + '</a>' +
+            '<span class="link-target"> (' + escape(target) + ')</span>';
+        }
       }
     });
     return text => {

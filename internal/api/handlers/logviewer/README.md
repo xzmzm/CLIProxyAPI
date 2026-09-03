@@ -11,8 +11,9 @@ or additional service. Rebuild and restart the server after updating its source.
   Role-colored message cards distinguish right-aligned users from assistants and
   instruction blocks. Tool calls/results retain literal payload formatting. Long
   content is rendered on expansion. Attachments are represented as text; logged HTML
-  and remote images are never executed or fetched. Markdown uses locally bundled
-  Marked and DOMPurify with a restricted tag/URL allowlist.
+  and remote images are never executed or fetched. Link destinations remain visible;
+  HTTP(S) and email links are clickable, while relative or unsafe targets are inert.
+  Markdown uses locally bundled Marked and DOMPurify with a restricted tag/URL allowlist.
 - **Tree → API (upstream)** (default) shows expandable upstream request and response
   JSON side by side. Each numbered retry and error stays separate, with response
   streams consolidated per attempt. Responses item events rebuild an empty final

@@ -74,6 +74,7 @@ body:has(dialog[open]) { overflow: hidden; }
 .markdown-body a { color: #285db2; text-decoration: underline; text-underline-offset: 3px; }
 .markdown-body a:hover { color: #173e80; }
 .markdown-body a:not([href]) { color: inherit; text-decoration: none; }
+.markdown-body .link-target { color: #6c7890; font-family: Consolas, ui-monospace, monospace; font-size: .85em; overflow-wrap: anywhere; }
 .markdown-body hr { border: 0; border-top: 1px solid #dbe3ee; margin: 1.5em 0; }
 .markdown-table { overflow-x: auto; margin: 1em 0; border: 1px solid #dce4ef; border-radius: 8px; }
 .markdown-body table { width: 100%; border-collapse: collapse; font-size: .875rem; white-space: normal; background: #fff; }
