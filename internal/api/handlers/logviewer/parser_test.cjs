@@ -9,6 +9,22 @@ test('Responses completion replaces output deltas', () => {
   const response = consolidate([{type:'response.output_text.delta', delta:'Hello'}, {type:'response.completed', response:{output:[{role:'assistant', content:[{type:'output_text',text:'Hello'}]}]}}]);
   assert.deepEqual(messages(response).map(m => m.text), ['Hello']);
 });
+test('Responses reconstructs output items when the completed upstream envelope is empty', () => {
+  const events = [
+    {type:'response.created',response:{id:'r1',status:'in_progress',output:[]}},
+    {type:'response.output_item.added',output_index:0,item:{id:'reasoning',type:'reasoning',summary:[]}},
+    {type:'response.output_item.done',output_index:0,item:{id:'reasoning',type:'reasoning',summary:[{type:'summary_text',text:'Summary'}]}},
+    {type:'response.output_item.added',output_index:1,item:{id:'message',type:'message',role:'assistant',content:[]}},
+    {type:'response.output_text.delta',output_index:1,content_index:0,delta:'Hello'},
+    {type:'response.output_item.done',output_index:1,item:{id:'message',type:'message',role:'assistant',content:[{type:'output_text',text:'Hello'}]}},
+    {type:'response.completed',response:{id:'r1',status:'completed',output:[],usage:{output_tokens:1}}}
+  ];
+  const response = consolidate(events);
+  assert.equal(response.status, 'completed');
+  assert.equal(response.output.length, 2);
+  assert.deepEqual(response.output.map(item => item.type), ['reasoning','message']);
+  assert.equal(response.output[1].content[0].text, 'Hello');
+});
 test('Incomplete Responses stream preserves text and tools', () => {
   const response = consolidate([{type:'response.output_text.delta', output_index:0, delta:'Hel'}, {type:'response.output_text.delta',output_index:0,delta:'lo'}, {type:'response.output_item.added',output_index:1,item:{type:'function_call',name:'test',call_id:'call-1',arguments:''}}, {type:'response.function_call_arguments.delta',output_index:1,delta:'{"a":1}'}]);
   const chat = messages(response);
@@ -45,6 +61,35 @@ test('WebSocket turns preserve order', () => {
 test('Gemini request and response parts', () => {
   const parsed = messages({systemInstruction:{parts:[{text:'Rules'}]},contents:[{role:'user',parts:[{text:'Hi'}]}],candidates:[{content:{role:'model',parts:[{text:'Hello'}]}}]});
   assert.deepEqual(parsed.map(m => m.role), ['system','user','assistant']);
+});
+test('Wrapped Antigravity Gemini chunks consolidate candidates, parts, finish state and usage', () => {
+  const events = [
+    {response:{candidates:[{content:{role:'model',parts:[{text:'think ',thought:true}]}}],usageMetadata:{promptTokenCount:10},modelVersion:'gemini-test'},traceId:'trace-1',metadata:{source:'antigravity'}},
+    {response:{candidates:[{content:{role:'model',parts:[{text:'carefully',thought:true},{text:'Hello '}]}}],usageMetadata:{promptTokenCount:10,candidatesTokenCount:2,totalTokenCount:12},modelVersion:'gemini-test'},traceId:'trace-1',metadata:{source:'antigravity'}},
+    {response:{candidates:[{content:{role:'model',parts:[{text:'world',thoughtSignature:'signature'}]},finishReason:'STOP'}],usageMetadata:{promptTokenCount:10,candidatesTokenCount:3,totalTokenCount:13},modelVersion:'gemini-test',responseId:'response-1'},traceId:'trace-1',metadata:{source:'antigravity'}}
+  ];
+  const result = consolidate(events);
+  assert.equal(result.traceId, 'trace-1');
+  assert.deepEqual(result.metadata, {source:'antigravity'});
+  assert.equal(result.response.candidates.length, 1);
+  assert.equal(result.response.candidates[0].finishReason, 'STOP');
+  assert.deepEqual(result.response.candidates[0].content.parts, [
+    {text:'think carefully',thought:true},
+    {text:'Hello world',thoughtSignature:'signature'}
+  ]);
+  assert.equal(result.response.usageMetadata.totalTokenCount, 13);
+  assert.equal(result.response.responseId, 'response-1');
+});
+test('Unwrapped Gemini chunks retain multiple candidates and merge cumulative metadata', () => {
+  const result = consolidate([
+    {candidates:[{index:0,content:{role:'model',parts:[{text:'A'}]}},{index:1,content:{role:'model',parts:[{text:'X'}]}}],usageMetadata:{promptTokenCount:2},modelVersion:'gemini-test'},
+    {candidates:[{index:0,content:{role:'model',parts:[{text:'B'}]},finishReason:'STOP'},{index:1,content:{role:'model',parts:[{text:'Y'}]},finishReason:'MAX_TOKENS'}],usageMetadata:{candidatesTokenCount:4,totalTokenCount:6},responseId:'r1'}
+  ]);
+  assert.deepEqual(result.candidates.map(candidate => candidate.content.parts[0].text), ['AB','XY']);
+  assert.deepEqual(result.candidates.map(candidate => candidate.finishReason), ['STOP','MAX_TOKENS']);
+  assert.deepEqual(result.usageMetadata, {promptTokenCount:2,candidatesTokenCount:4,totalTokenCount:6});
+  assert.equal(result.modelVersion, 'gemini-test');
+  assert.equal(result.responseId, 'r1');
 });
 test('Untrusted HTML remains plain text, attachments are not fetched', () => {
   const chat = messages({messages:[{role:'user',content:[{type:'text',text:'<img src=x onerror=alert(1)>'},{type:'image_url',image_url:{url:'https://private.example/image'}}]}]});

@@ -91,6 +91,16 @@ body:has(dialog[open]) { overflow: hidden; }
 .timeline-panel { margin-top: 18px; }
 .tree-record + .tree-record { margin-top: 22px; padding-top: 18px; border-top: 1px solid #dce4ef; }
 .tree-record h4 { margin: 0 0 12px; color: #526681; font-size: .75rem; letter-spacing: .05em; }
+.tree-node { padding: 2px 0 2px 14px; }
+.tree-node details { margin-left: 0; }
+.tree-node summary { list-style: none; position: relative; }
+.tree-node summary::-webkit-details-marker { display: none; }
+.tree-node summary::before {
+  content: '›'; position: absolute; left: -13px; top: -1px;
+  color: #526681; font-size: 1.05rem; line-height: 1.35;
+  transition: transform .12s ease;
+}
+.tree-node details[open] > summary::before { transform: rotate(90deg); }
 @media (max-width: 900px) {
   .message { max-width: 95%; }
   .message .message-header { padding: 12px 14px 0; gap: 8px; flex-wrap: wrap; }

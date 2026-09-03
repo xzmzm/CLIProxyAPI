@@ -40,8 +40,10 @@
 
   function consolidate(events) {
     if (events.length === 1 && !events[0]?.type?.startsWith('response.') && !events[0]?.choices?.[0]?.delta) return events[0];
-    // Completed Responses payloads include the full output. Do not also append deltas.
-    const completed = events.filter(e => ['response.completed', 'response.done', 'response.incomplete', 'response.failed'].includes(e.type) && e.response);
+    if (events.some(e => Array.isArray(e?.candidates) || Array.isArray(e?.response?.candidates))) return consolidateGemini(events);
+    // Prefer a complete Responses payload, but reconstruct output from item events
+    // when an upstream completion envelope incorrectly carries an empty array.
+    const completed = events.filter(e => ['response.completed', 'response.done', 'response.incomplete', 'response.failed'].includes(e.type) && e.response?.output?.length);
     if (completed.length) return completed.length === 1 ? completed[0].response : completed.map(e => e.response);
     const items = new Map(), choices = new Map(), blocks = new Map();
     let envelope = {}, usage, error;
@@ -104,9 +106,50 @@
     if (choices.size) return {choices:[...choices.values()], usage, error};
     if (blocks.size) return {...envelope, content:[...blocks.values()].map(b => b.partial ? {...b, input:json(b.partial) ?? b.partial} : b), usage, error};
     if (items.size) return {...envelope, output:[...items.values()], usage, error};
-    // Gemini streaming chunks carry independent text fragments.
-    if (events.some(e => e.candidates)) return {candidates:[{content:{role:'model', parts:events.flatMap(e => e.candidates?.[0]?.content?.parts || [])}}]};
     return events.length === 1 ? events[0] : events;
+  }
+
+  function consolidateGemini(events) {
+    const wrapped = events.some(event => Array.isArray(event?.response?.candidates));
+    const candidates = new Map();
+    let response = {}, wrapper = {};
+    const mergePart = (parts, part) => {
+      const previous = parts.at(-1);
+      const isText = part && typeof part.text === 'string' && !part.functionCall && !part.functionResponse && !part.inlineData && !part.fileData;
+      const sameKind = isText && previous && typeof previous.text === 'string' && Boolean(previous.thought) === Boolean(part.thought);
+      if (!sameKind) { parts.push({...part}); return; }
+      previous.text += part.text;
+      if (part.thoughtSignature != null) previous.thoughtSignature = part.thoughtSignature;
+    };
+    for (const event of events) {
+      const chunk = wrapped ? event.response : event;
+      if (!chunk || typeof chunk !== 'object') continue;
+      const usageMetadata = {...response.usageMetadata, ...chunk.usageMetadata};
+      response = {...response, ...chunk};
+      if (Object.keys(usageMetadata).length) response.usageMetadata = usageMetadata;
+      delete response.candidates;
+      if (wrapped) {
+        const metadata = {...wrapper.metadata, ...event.metadata};
+        wrapper = {...wrapper, ...event};
+        if (Object.keys(metadata).length) wrapper.metadata = metadata;
+        delete wrapper.response;
+      }
+      (chunk.candidates || []).forEach((candidate, position) => {
+        const key = candidate.index ?? position;
+        const target = candidates.get(key) || {index:candidate.index, content:{role:candidate.content?.role || 'model', parts:[]}};
+        const parts = target.content?.parts || [];
+        Object.assign(target, candidate);
+        target.content = {...target.content, ...candidate.content, parts};
+        for (const part of candidate.content?.parts || []) mergePart(parts, part);
+        candidates.set(key, target);
+      });
+    }
+    response.candidates = [...candidates.values()].map(candidate => {
+      if (candidate.index != null) return candidate;
+      const {index, ...rest} = candidate;
+      return rest;
+    });
+    return wrapped ? {...wrapper, response} : response;
   }
 
   function messages(payload, fallback = 'assistant') {

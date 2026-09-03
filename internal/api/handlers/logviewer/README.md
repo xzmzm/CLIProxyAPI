@@ -15,9 +15,11 @@ or additional service. Rebuild and restart the server after updating its source.
   Marked and DOMPurify with a restricted tag/URL allowlist.
 - **Tree → API (upstream)** (default) shows expandable upstream request and response
   JSON side by side. Each numbered retry and error stays separate, with response
-  streams consolidated per attempt. Headers, original events, and recorded sections
-  remain available. **Tree → Proxy** shows the incoming client request and the
-  response returned by the proxy. WebSocket timelines preserve event order.
+  streams consolidated per attempt. Responses item events rebuild an empty final
+  `output`, and wrapped Gemini/Antigravity chunks merge candidates, adjacent text
+  parts, completion state, and usage. Headers, original events, and recorded
+  sections remain available. **Tree → Proxy** shows the incoming client request and
+  the response returned by the proxy. WebSocket timelines preserve event order.
 - **Raw → API** (default) shows upstream API requests and responses side by side,
   including numbered retries, upstream errors, and API WebSocket timelines.
   **Raw → Proxy** shows the original incoming request and the response sent back
