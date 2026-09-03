@@ -73,6 +73,17 @@ test('Sanitizer failure falls back to literal text', t => {
   assert.match(node.querySelector('pre').textContent, /<script>/);
 });
 
+test('Viewer stylesheet carries the Management Center theme tokens and controls', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'assets/viewer.css'), 'utf8');
+  for (const token of ['--bg-primary: #f0eee8','--bg-secondary: #faf9f5','--bg-tertiary: #e9e6df','--text-primary: #2d2a26','--primary: #8b8680','--border: #e3e1db']) {
+    assert.match(css, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.match(css, /button\.primary\s*\{[^}]*background:\s*var\(--primary\)/s);
+  assert.match(css, /\.table-wrap\s*\{[^}]*border-radius:\s*12px/s);
+  assert.match(css, /\.tabs \[aria-selected=true\]\s*\{[^}]*background:\s*var\(--bg-secondary\)/s);
+  assert.match(css, /\.message\.tool-call\s*\{[^}]*background:\s*#2d2a26/s);
+});
+
 const nextTurn = () => new Promise(resolve => setImmediate(resolve));
 test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with keyboard navigation', async t => {
   const html = fs.readFileSync(path.join(__dirname, 'assets/index.html'), 'utf8');
