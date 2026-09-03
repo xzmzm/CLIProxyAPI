@@ -1,0 +1,11 @@
+# Publish only audited setup sources. Credentials, logs, backups, binaries,
+# and machine-specific overrides stay private even when new files are created.
+*
+!.gitignore
+!README.md
+!proxy.cmd
+!proxy.ps1
+!go-env.ps1
+!codex-provider.toml
+!credentials.example.json
+!config.example.yaml

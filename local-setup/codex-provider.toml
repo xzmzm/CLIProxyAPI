@@ -1,0 +1,13 @@
+# Merge these sections into your Codex CLI configuration if you want to use
+# this proxy from the CLI. Load CLIPROXY_API_KEY in that terminal first.
+# The profile applies only when you explicitly run: codex --profile cliproxy
+
+[model_providers.cliproxy]
+name = "Local CLIProxyAPI"
+base_url = "http://127.0.0.1:8317/v1"
+wire_api = "responses"
+env_key = "CLIPROXY_API_KEY"
+
+[profiles.cliproxy]
+model_provider = "cliproxy"
+model = "gpt-5.4-mini"

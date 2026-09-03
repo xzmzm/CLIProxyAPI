@@ -1,0 +1,6 @@
+{
+  "name": "cliproxy-logviewer-tests",
+  "private": true,
+  "scripts": { "test": "node --test parser_test.cjs markdown_test.cjs" },
+  "devDependencies": { "jsdom": "30.0.1" }
+}

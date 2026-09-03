@@ -52,6 +52,7 @@ func (s *Server) setupRoutes() {
 	s.engine.HEAD("/healthz", healthzHandler)
 
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
+	s.setupLogViewerRoutes()
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	geminiHandlers := gemini.NewGeminiAPIHandler(s.handlers)
 	claudeCodeHandlers := claude.NewClaudeCodeAPIHandler(s.handlers)

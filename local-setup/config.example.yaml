@@ -1,0 +1,13 @@
+# Copy to config.yaml at the repository root; never commit the populated copy.
+host: "127.0.0.1"
+port: 8317
+auth-dir: "./auths"
+api-keys:
+  - "REPLACE_WITH_YOUR_LOCAL_API_KEY"
+remote-management:
+  allow-remote: false
+  secret-key: "REPLACE_WITH_YOUR_LOCAL_MANAGEMENT_KEY"
+  disable-control-panel: false
+request-log: true
+logging-to-file: false
+usage-statistics-enabled: true

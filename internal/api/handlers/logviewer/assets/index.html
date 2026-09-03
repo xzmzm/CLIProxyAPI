@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Request logs · CLI Proxy API</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/logs/viewer.css">
+  <script src="/logs/parser.js" defer></script>
+  <script src="/logs/vendor/marked.umd.js" defer></script>
+  <script src="/logs/vendor/purify.min.js" defer></script>
+  <script src="/logs/markdown.js" defer></script>
+  <script src="/logs/viewer.js" defer></script>
+</head>
+<body>
+  <header class="app-header"><div class="brand"><span class="brand-mark">CP</span><div><strong>CLI Proxy API</strong><span class="muted">Request logs</span></div></div><span class="local-badge">Local access only</span></header>
+  <main>
+    <div class="page-heading"><div><p class="eyebrow">OBSERVABILITY</p><h1>Traffic monitor</h1><p class="muted">Inspect requests, responses, and streaming activity.</p></div><button id="refresh" class="primary">Refresh</button></div>
+    <div class="toolbar"><label for="search">Find a request</label><input id="search" type="search" placeholder="Endpoint, request ID, or filename…"><span id="count" class="muted" role="status"></span></div>
+    <p id="error" class="error" role="alert" hidden></p>
+    <div class="table-wrap"><table><thead><tr><th>Request ID</th><th>Time</th><th>Endpoint</th><th>Model</th><th>Type</th><th>Status</th><th title="Approximate time from request start to log file modification">Duration ≈</th><th>Size</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="entries"></tbody></table><p id="empty" class="empty" hidden>No request logs found.</p></div>
+    <footer class="pagination"><span id="page-label" class="muted"></span><div><button id="previous">Previous</button><button id="next">Next</button></div></footer>
+    <p class="footnote">Reads existing request log files. Use Refresh to include newly saved requests; in-flight requests may not appear until complete.</p>
+  </main>
+  <dialog id="detail" aria-labelledby="detail-title">
+    <div class="detail-header"><div><h2 id="detail-title">Request &amp; response</h2><span id="detail-meta" class="muted mono"></span></div><div class="detail-actions"><div class="tabs" role="tablist" aria-label="Log detail view"><button id="tab-chat" role="tab" aria-controls="content" aria-selected="true" data-view="chat">Chat</button><button id="tab-tree" role="tab" aria-controls="content" aria-selected="false" tabindex="-1" data-view="tree">Tree</button><button id="tab-raw" role="tab" aria-controls="content" aria-selected="false" tabindex="-1" data-view="raw">Raw</button></div><a id="download" class="button" download>Download raw</a><button id="fullscreen" aria-label="Toggle fullscreen" aria-pressed="false">⛶</button><button id="close" aria-label="Close details">×</button></div></div>
+    <div id="content" role="tabpanel" aria-labelledby="tab-chat" tabindex="0"></div>
+  </dialog>
+</body>
+</html>

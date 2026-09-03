@@ -181,6 +181,11 @@ func (l *FileRequestLogger) IsEnabled() bool {
 	return l.enabled
 }
 
+// LogDirectory returns the resolved directory used by this request logger.
+func (l *FileRequestLogger) LogDirectory() string {
+	return l.logsDir
+}
+
 // SetEnabled updates the request logging enabled state.
 // This method allows dynamic enabling/disabling of request logging.
 //
