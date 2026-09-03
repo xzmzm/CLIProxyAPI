@@ -185,7 +185,7 @@ func TestLogViewerRejectsUnsafePaths(t *testing.T) {
 func TestLogViewerAssetsAndMalformedLog(t *testing.T) {
 	dir := t.TempDir()
 	engine := router(dir)
-	for _, path := range []string{"/logs", "/logs/", "/logs/viewer.css", "/logs/viewer.js", "/logs/parser.js", "/logs/markdown.js", "/logs/vendor/marked.umd.js", "/logs/vendor/purify.min.js"} {
+	for _, path := range []string{"/logs", "/logs/", "/logs/viewer.css", "/logs/management.css", "/logs/viewer.js", "/logs/parser.js", "/logs/markdown.js", "/logs/vendor/marked.umd.js", "/logs/vendor/purify.min.js"} {
 		response := request(engine, path)
 		if response.Code != 200 || response.Body.Len() == 0 || !strings.Contains(response.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") {
 			t.Fatalf("missing embedded asset or security policy: %s", path)

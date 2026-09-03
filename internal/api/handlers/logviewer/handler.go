@@ -19,7 +19,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-//go:embed assets/index.html assets/viewer.css assets/viewer.js assets/parser.js assets/markdown.js assets/vendor
+//go:embed assets/index.html assets/viewer.css assets/management.css assets/viewer.js assets/parser.js assets/markdown.js assets/vendor
 var assets embed.FS
 
 const maxDetailSize = 64 << 20
@@ -47,6 +47,7 @@ func (h *Handler) Register(engine *gin.Engine) {
 	group.GET("", serveAsset("index.html", "text/html; charset=utf-8"))
 	group.GET("/", serveAsset("index.html", "text/html; charset=utf-8"))
 	group.GET("/viewer.css", serveAsset("viewer.css", "text/css; charset=utf-8"))
+	group.GET("/management.css", serveAsset("management.css", "text/css; charset=utf-8"))
 	group.GET("/viewer.js", serveAsset("viewer.js", "text/javascript; charset=utf-8"))
 	group.GET("/parser.js", serveAsset("parser.js", "text/javascript; charset=utf-8"))
 	group.GET("/markdown.js", serveAsset("markdown.js", "text/javascript; charset=utf-8"))

@@ -307,6 +307,12 @@ document.querySelectorAll('[data-view]').forEach(tab => {
     state.view = views[index]; renderView(); $('tab-' + state.view).focus();
   });
 });
+$('sidebar-toggle').addEventListener('click', () => {
+  const collapsed = document.querySelector('.app-shell').classList.toggle('sidebar-is-collapsed');
+  $('sidebar-toggle').setAttribute('aria-expanded', String(!collapsed));
+  $('sidebar-toggle').setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+  $('sidebar-toggle').title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
+});
 $('close').addEventListener('click', () => $('detail').close());
 $('detail').addEventListener('close', () => { state.detailVersion++; state.parsed = null; $('content').replaceChildren(); });
 $('fullscreen').addEventListener('click', () => { const active = $('detail').classList.toggle('fullscreen'); $('fullscreen').setAttribute('aria-pressed', String(active)); });

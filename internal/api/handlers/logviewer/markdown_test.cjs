@@ -73,15 +73,19 @@ test('Sanitizer failure falls back to literal text', t => {
   assert.match(node.querySelector('pre').textContent, /<script>/);
 });
 
-test('Viewer stylesheet carries the Management Center theme tokens and controls', () => {
-  const css = fs.readFileSync(path.join(__dirname, 'assets/viewer.css'), 'utf8');
-  for (const token of ['--bg-primary: #f0eee8','--bg-secondary: #faf9f5','--bg-tertiary: #e9e6df','--text-primary: #2d2a26','--primary: #8b8680','--border: #e3e1db']) {
-    assert.match(css, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+test('Viewer stylesheet carries the Management Center shell, tokens, and motion', () => {
+  const css = fs.readFileSync(path.join(__dirname, 'assets/management.css'), 'utf8');
+  for (const token of ['--bg-primary: #fff','--bg-secondary: #fff','--bg-tertiary: #f6f6f6','--text-primary: #2d2a26','--primary: #8b8680','--border: #e5e5e5']) {
+    const managementToken = token.replace('--primary:', '--primary-color:').replace('--border:', '--border-color:');
+    assert.match(css, new RegExp(managementToken.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
-  assert.match(css, /button\.primary\s*\{[^}]*background:\s*var\(--primary\)/s);
-  assert.match(css, /\.table-wrap\s*\{[^}]*border-radius:\s*12px/s);
-  assert.match(css, /\.tabs \[aria-selected=true\]\s*\{[^}]*background:\s*var\(--bg-secondary\)/s);
-  assert.match(css, /\.message\.tool-call\s*\{[^}]*background:\s*#2d2a26/s);
+  assert.match(css, /--ease-out-strong:\s*cubic-bezier\(\.23, 1, \.32, 1\)/);
+  assert.match(css, /--sidebar-panel-width:\s*216px/);
+  assert.match(css, /\.header-actions\s*\{[^}]*backdrop-filter:\s*blur\(16px\)/s);
+  assert.match(css, /\.request-card\s*\{[^}]*animation:\s*request-card-in 450ms/s);
+  assert.match(css, /dialog\[open\]\s*\{[^}]*animation:\s*modal-scale-in 350ms/s);
+  assert.match(css, /\.nav-item:hover\s*\{[^}]*transform:\s*translateX\(1px\)/s);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve));
@@ -107,6 +111,10 @@ test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with 
     win.eval(fs.readFileSync(path.join(__dirname, 'assets', file), 'utf8'));
   }
   await nextTurn();
+  doc.querySelector('#sidebar-toggle').click();
+  assert.ok(doc.querySelector('.app-shell').classList.contains('sidebar-is-collapsed'));
+  assert.equal(doc.querySelector('#sidebar-toggle').getAttribute('aria-expanded'), 'false');
+  assert.equal(doc.querySelector('#sidebar-toggle').getAttribute('aria-label'), 'Expand sidebar');
   doc.querySelector('#entries button').click();
   await nextTurn();
   assert.equal(doc.querySelector('.message.user h2').textContent, 'Question');

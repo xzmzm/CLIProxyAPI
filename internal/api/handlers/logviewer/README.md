@@ -2,9 +2,10 @@
 
 Open `http://localhost:8317/logs` (replace the port if configured differently).
 The viewer is embedded in the server binary and needs no frontend build, CDN,
-or additional service. Its colors, typography, surfaces, controls, and spacing follow
-the bundled Management Center's visual system. Rebuild and restart the server after
-updating its source.
+or additional service. Its application shell, colors, typography, glass controls,
+spacing, and motion follow the bundled Management Center's visual system, including
+reduced-motion and reduced-transparency fallbacks. Rebuild and restart the server
+after updating its source.
 
 - The table lists saved request log files newest-first, with 50 entries per page.
   Search matches the filename, which contains the endpoint, timestamp, and request ID.
