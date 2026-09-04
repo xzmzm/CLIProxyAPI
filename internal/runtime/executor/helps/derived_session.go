@@ -3,6 +3,7 @@ package helps
 import (
 	"crypto/sha256"
 	"encoding/binary"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -34,6 +35,13 @@ func ProviderSessionUUID(provider string, metadataSets ...map[string]any) string
 		}
 	}
 	return DerivedSessionUUID(provider, metadataSets...)
+}
+
+// ProviderHeaderSessionUUID maps a generic downstream session header to a
+// provider-scoped stable UUID.
+func ProviderHeaderSessionUUID(provider string, headers http.Header) string {
+	sessionID := cliproxysession.NormalizeExplicitID(HeaderValueCaseInsensitive(headers, "X-Session-ID"))
+	return stableProviderSessionUUID(provider, "header-session", sessionID)
 }
 
 func stableProviderSessionUUID(provider string, kind string, identityValue string) string {

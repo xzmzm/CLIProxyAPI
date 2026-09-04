@@ -54,6 +54,9 @@ func applyCodexPromptCacheHeadersWithContext(ctx context.Context, from sdktransl
 	if cache.ID == "" {
 		cache.ID = helps.ProviderSessionUUID("codex", req.Metadata)
 	}
+	if cache.ID == "" {
+		cache.ID = helps.ProviderHeaderSessionUUID("codex", requestHeaders)
+	}
 
 	if cache.ID != "" {
 		rawJSON = helps.SetStringIfDifferent(rawJSON, "prompt_cache_key", cache.ID)

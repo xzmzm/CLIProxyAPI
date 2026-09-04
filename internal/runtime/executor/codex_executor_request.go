@@ -124,17 +124,17 @@ func (e *CodexExecutor) cacheHelper(ctx context.Context, from sdktranslator.Form
 		if promptCacheKey := gjson.GetBytes(req.Payload, "prompt_cache_key"); promptCacheKey.Exists() {
 			cache.ID = strings.TrimSpace(promptCacheKey.String())
 		}
-		if cache.ID == "" {
-			cache.ID = helps.ProviderSessionUUID("codex", req.Metadata)
-		}
-		if cache.ID == "" {
-			if apiKey := strings.TrimSpace(helps.APIKeyFromContext(ctx)); apiKey != "" {
-				cache.ID = uuid.NewSHA1(uuid.NameSpaceOID, []byte("cli-proxy-api:codex:prompt-cache:"+apiKey)).String()
-			}
-		}
 	}
 	if cache.ID == "" {
 		cache.ID = helps.ProviderSessionUUID("codex", req.Metadata)
+	}
+	if cache.ID == "" {
+		cache.ID = helps.ProviderHeaderSessionUUID("codex", headers)
+	}
+	if cache.ID == "" && sourceFormatEqual(from, sdktranslator.FormatOpenAI) {
+		if apiKey := strings.TrimSpace(helps.APIKeyFromContext(ctx)); apiKey != "" {
+			cache.ID = uuid.NewSHA1(uuid.NameSpaceOID, []byte("cli-proxy-api:codex:prompt-cache:"+apiKey)).String()
+		}
 	}
 
 	if cache.ID != "" {

@@ -1,6 +1,7 @@
 package helps
 
 import (
+	"net/http"
 	"regexp"
 	"testing"
 
@@ -65,5 +66,25 @@ func TestDerivedSessionProviderMappingsRequireIdentity(t *testing.T) {
 	}
 	if got := DerivedAntigravitySessionID(nil); got != "" {
 		t.Fatalf("DerivedAntigravitySessionID() = %q, want empty", got)
+	}
+}
+
+func TestProviderHeaderSessionUUID(t *testing.T) {
+	t.Parallel()
+
+	headers := http.Header{"x-session-id": []string{" zcode-session-1 "}}
+	first := ProviderHeaderSessionUUID("codex", headers)
+	second := ProviderHeaderSessionUUID("codex", headers)
+	if first == "" || first != second {
+		t.Fatalf("header session UUID is not stable: first=%q second=%q", first, second)
+	}
+	if _, errParse := uuid.Parse(first); errParse != nil {
+		t.Fatalf("header session UUID %q is invalid: %v", first, errParse)
+	}
+	if other := ProviderHeaderSessionUUID("xai", headers); other == first {
+		t.Fatalf("provider namespaces produced the same header session UUID: %q", first)
+	}
+	if got := ProviderHeaderSessionUUID("codex", nil); got != "" {
+		t.Fatalf("nil-header session UUID = %q, want empty", got)
 	}
 }

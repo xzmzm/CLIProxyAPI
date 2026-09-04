@@ -17,6 +17,7 @@ import (
 	internalcache "github.com/router-for-me/CLIProxyAPI/v7/internal/cache"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/runtime/executor/helps"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v7/sdk/config"
@@ -1402,6 +1403,31 @@ func TestApplyCodexPromptCacheHeadersUsesDerivedSessionUUID(t *testing.T) {
 	}
 	if got := headers.Get("Conversation_id"); got != cacheKey {
 		t.Fatalf("Conversation_id = %q, want %q", got, cacheKey)
+	}
+}
+
+func TestApplyCodexPromptCacheHeadersUsesGenericSessionHeader(t *testing.T) {
+	t.Parallel()
+
+	headers := http.Header{}
+	headers.Set("X-Session-Id", "zcode-websocket-session-1")
+	req := cliproxyexecutor.Request{
+		Model:   "gpt-5.6-sol",
+		Payload: []byte(`{"model":"gpt-5.6-sol","input":"hello"}`),
+	}
+	expectedKey := helps.ProviderHeaderSessionUUID("codex", headers)
+	body, upstreamHeaders, err := applyCodexPromptCacheHeadersWithContext(context.Background(), sdktranslator.FormatOpenAIResponse, req, []byte(`{"model":"gpt-5.6-sol"}`), headers)
+	if err != nil {
+		t.Fatalf("applyCodexPromptCacheHeadersWithContext error: %v", err)
+	}
+	if got := gjson.GetBytes(body, "prompt_cache_key").String(); got != expectedKey {
+		t.Fatalf("prompt_cache_key = %q, want %q", got, expectedKey)
+	}
+	if got := upstreamHeaders["session_id"]; len(got) != 1 || got[0] != expectedKey {
+		t.Fatalf("session_id = %#v, want [%q]", got, expectedKey)
+	}
+	if got := upstreamHeaders.Get("Conversation_id"); got != expectedKey {
+		t.Fatalf("Conversation_id = %q, want %q", got, expectedKey)
 	}
 }
 

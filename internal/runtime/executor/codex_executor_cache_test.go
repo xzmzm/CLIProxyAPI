@@ -96,6 +96,41 @@ func TestCodexExecutorCacheHelper_UsesDerivedSessionUUID(t *testing.T) {
 	}
 }
 
+func TestCodexExecutorCacheHelper_UsesGenericSessionHeaderAcrossFormats(t *testing.T) {
+	t.Parallel()
+
+	headers := http.Header{}
+	headers.Set("X-Session-Id", "zcode-session-1")
+	expectedKey := helps.ProviderHeaderSessionUUID("codex", headers)
+	executor := &CodexExecutor{}
+
+	for _, from := range []sdktranslator.Format{
+		sdktranslator.FormatOpenAIResponse,
+		sdktranslator.FormatOpenAI,
+		sdktranslator.FormatClaude,
+	} {
+		from := from
+		t.Run(from.String(), func(t *testing.T) {
+			t.Parallel()
+
+			req := cliproxyexecutor.Request{
+				Model:   "gpt-5.6-sol",
+				Payload: []byte(`{"model":"gpt-5.6-sol","input":"hello"}`),
+			}
+			httpReq, body, _, err := executor.cacheHelper(context.Background(), from, "https://example.com/responses", nil, req, req.Payload, []byte(`{"model":"gpt-5.6-sol","stream":true}`), headers)
+			if err != nil {
+				t.Fatalf("cacheHelper error: %v", err)
+			}
+			if got := gjson.GetBytes(body, "prompt_cache_key").String(); got != expectedKey {
+				t.Fatalf("prompt_cache_key = %q, want %q", got, expectedKey)
+			}
+			if got := httpReq.Header.Get("Session-Id"); got != expectedKey {
+				t.Fatalf("Session-Id = %q, want %q", got, expectedKey)
+			}
+		})
+	}
+}
+
 func TestCodexExecutorCacheHelper_ClaudeUsesClaudeCodeSessionID(t *testing.T) {
 	executor := &CodexExecutor{}
 	ctx := context.Background()
