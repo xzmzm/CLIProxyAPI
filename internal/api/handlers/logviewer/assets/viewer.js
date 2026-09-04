@@ -89,6 +89,30 @@ function folded(title, child, open = false) {
   return node;
 }
 
+function renderImage(image) {
+  const figure = element('figure', null, 'chat-image');
+  const caption = element('figcaption', image.remote ? 'External image · ' + new URL(image.src).host : 'Attached image');
+  const load = () => {
+    const img = element('img');
+    img.alt = 'Chat image attachment';
+    img.loading = 'lazy';
+    img.decoding = 'async';
+    img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => {
+      img.remove();
+      caption.textContent = 'Image could not be loaded. Inspect Tree or Raw view for the recorded source.';
+    }, {once:true});
+    img.src = image.src;
+    figure.replaceChildren(img, caption);
+  };
+  if (image.remote) {
+    const button = element('button', 'Load external image');
+    button.addEventListener('click', load, {once:true});
+    figure.append(caption, button);
+  } else load();
+  return figure;
+}
+
 function renderChat() {
   const node = element('div', null, 'chat');
   const entry = state.selected;
@@ -131,7 +155,7 @@ function renderChat() {
       block.append(heading);
       const body = element('div', null, 'message-body');
       const isTool = role === 'tool' || role === 'tool-call';
-      const content = () => isTool ? element('pre', message.text, 'tool-payload') : LogMarkdown.render(message.text);
+      const content = () => message.image ? renderImage(message.image) : isTool ? element('pre', message.text, 'tool-payload') : LogMarkdown.render(message.text);
       // Render long content on expansion, not while building every collapsed message.
       if (message.text.length > 12000 || role === 'reasoning') {
         const container = element('div');

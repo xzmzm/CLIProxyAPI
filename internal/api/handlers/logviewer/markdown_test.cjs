@@ -99,7 +99,11 @@ test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with 
   win.HTMLDialogElement.prototype.close = function () { this.open = false; this.dispatchEvent(new win.Event('close')); };
   const entry = {name:'v1-responses-2026-09-03T100000-test.log',id:'test',time:'2026-09-03T10:00:00Z',method:'POST',url:'/v1/responses',model:'test',transport:'HTTP',status:200,duration:1,size:1000};
   const sections = [
-    {name:'REQUEST BODY',text:JSON.stringify({input:[{role:'user',content:'## Question\n\n**Please** explain.'},{type:'function_call',name:'run',arguments:'{"text":"# literal"}',call_id:'c1'}]})},
+    {name:'REQUEST BODY',text:JSON.stringify({input:[{role:'user',content:[
+      {type:'input_text',text:'## Question\n\n**Please** explain.'},
+      {type:'input_image',image_url:'data:image/png;base64,aGVsbG8='},
+      {type:'input_image',image_url:'https://images.example/screenshot.png'}
+    ]},{type:'function_call',name:'run',arguments:'{"text":"# literal"}',call_id:'c1'}]})},
     {name:'API REQUEST 1',text:'POST upstream\nBody:\n{"model":"provider-model"}\n'},
     {name:'API ERROR RESPONSE',text:'HTTP Status: 429\nquota\n'},
     {name:'API REQUEST 2',text:'POST retry\n'},
@@ -119,6 +123,15 @@ test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with 
   await nextTurn();
   assert.equal(doc.querySelector('.message.user h2').textContent, 'Question');
   assert.equal(doc.querySelector('.message.user strong').textContent, 'Please');
+  const embeddedImage = doc.querySelector('.message.user .chat-image img');
+  assert.equal(embeddedImage.getAttribute('src'), 'data:image/png;base64,aGVsbG8=');
+  assert.equal(embeddedImage.loading, 'lazy');
+  const externalFigure = [...doc.querySelectorAll('.message.user .chat-image')].find(figure => figure.querySelector('button'));
+  assert.match(externalFigure.textContent, /External image · images\.example/);
+  assert.equal(externalFigure.querySelector('img'), null);
+  externalFigure.querySelector('button').click();
+  assert.equal(externalFigure.querySelector('img').getAttribute('src'), 'https://images.example/screenshot.png');
+  assert.equal(externalFigure.querySelector('img').referrerPolicy, 'no-referrer');
   assert.equal(doc.querySelector('.message.assistant h1').textContent, 'Answer');
   assert.equal(doc.querySelectorAll('.message.assistant li').length, 2);
   assert.match(doc.querySelector('.tool-payload').textContent, /# literal/);
@@ -144,9 +157,11 @@ test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with 
   assert.match(tree, /RESPONSE/);
   assert.doesNotMatch(tree, /provider-model|upstream-result|quota/);
   // Expand the nested proxy request to inspect the original user message.
-  const requestItems = doc.querySelector('.tree-record .tree-node details details details');
-  requestItems.open = true;
-  requestItems.dispatchEvent(new win.Event('toggle'));
+  for (let depth = 0; depth < 6; depth++) {
+    for (const details of doc.querySelectorAll('.tree-record .tree-node details')) {
+      if (!details.open) { details.open = true; details.dispatchEvent(new win.Event('toggle')); }
+    }
+  }
   assert.match(doc.querySelector('#tree-exchange').textContent, /Please/);
   doc.querySelector('#tree-tab-client').dispatchEvent(new win.KeyboardEvent('keydown',{key:'Home',bubbles:true}));
   assert.equal(doc.activeElement.id, 'tree-tab-api');

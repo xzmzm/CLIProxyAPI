@@ -64,7 +64,7 @@ func localOnly(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	c.Header("X-Content-Type-Options", "nosniff")
 	c.Header("Referrer-Policy", "no-referrer")
-	c.Header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
+	c.Header("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src data: https: http:; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'")
 	c.Header("Cross-Origin-Resource-Policy", "same-origin")
 	c.Writer.Header().Del("Access-Control-Allow-Origin")
 	peer, _, errPeer := net.SplitHostPort(c.Request.RemoteAddr)

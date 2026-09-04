@@ -91,10 +91,96 @@ test('Unwrapped Gemini chunks retain multiple candidates and merge cumulative me
   assert.equal(result.modelVersion, 'gemini-test');
   assert.equal(result.responseId, 'r1');
 });
-test('Untrusted HTML remains plain text, attachments are not fetched', () => {
+test('Untrusted HTML remains plain text and external images are marked for manual loading', () => {
   const chat = messages({messages:[{role:'user',content:[{type:'text',text:'<img src=x onerror=alert(1)>'},{type:'image_url',image_url:{url:'https://private.example/image'}}]}]});
   assert.equal(chat[0].text,'<img src=x onerror=alert(1)>');
-  assert.match(chat[1].text,/Attachment|attachment/);
+  assert.deepEqual(chat[1].image, {src:'https://private.example/image', remote:true});
+});
+
+const png = 'data:image/png;base64,aGVsbG8=';
+test('Responses, Anthropic and Chat Completions preserve mixed text and images in order', () => {
+  const inputs = [
+    {input:[{role:'user',content:[{type:'input_text',text:'Before'},{type:'input_image',image_url:png},{type:'input_text',text:'After'}]}]},
+    {messages:[{role:'user',content:[{type:'text',text:'Before'},{type:'image',source:{type:'base64',media_type:'image/png',data:'aGVsbG8='}},{type:'text',text:'After'}]}]},
+    {messages:[{role:'user',content:[{type:'text',text:'Before'},{type:'image_url',image_url:{url:png,detail:'high'}},{type:'text',text:'After'}]}]}
+  ];
+  for (const payload of inputs) {
+    const chat = messages(payload);
+    assert.deepEqual(chat.map(m => m.text), ['Before','','After']);
+    assert.deepEqual(chat.map(m => m.role), ['user','user','user']);
+    assert.deepEqual(chat[1].image, {src:png,remote:false});
+  }
+});
+
+test('Tool result images retain tool IDs and surrounding literal text', () => {
+  const content = [{type:'text',text:'# Screenshot'},{type:'image',source:{type:'base64',media_type:'image/png',data:'aGVsbG8='}}];
+  const payloads = [
+    {messages:[{role:'user',content:[{type:'tool_result',tool_use_id:'t1',content}]}]},
+    {input:[{type:'function_call_output',call_id:'t1',output:content}]},
+    {messages:[{role:'tool',tool_call_id:'t1',content}]}
+  ];
+  for (const payload of payloads) {
+    const chat = messages(payload);
+    assert.equal(chat.length, 2);
+    assert.ok(chat.every(m => m.role === 'tool' && m.id === 't1'));
+    assert.equal(chat[0].text, '# Screenshot');
+    assert.equal(chat[1].image.src, png);
+  }
+});
+
+test('Image sources reject active, malformed, missing, and non-image attachments', () => {
+  for (const url of ['javascript:alert(1)','data:text/html;base64,aGVsbG8=','data:image/svg+xml;base64,aGVsbG8=','data:image/png;base64,','file:///tmp/image.png','/logs/api/entries','//example.com/a.png','https://user:pass@example.com/a.png','http://[invalid',null,{}]) {
+    const chat = messages({input:[{role:'user',content:[{type:'input_image',image_url:url}]}]});
+    assert.equal(chat[0].image, undefined);
+    assert.match(chat[0].text, /unavailable/);
+  }
+  assert.equal(messages({contents:[{parts:[{inlineData:{mimeType:'application/pdf',data:'aGVsbG8='}}]}]})[0].image, undefined);
+  assert.equal(messages({input:[{role:'user',content:[{type:'input_image',file_id:'file-123'}]}]})[0].image, undefined);
+});
+
+test('URL-backed Anthropic and Gemini image sources are recognized', () => {
+  const chat = messages({messages:[{role:'user',content:[
+    {type:'image',source:{type:'url',url:'https://example.com/image.png'}},
+    {inlineData:{mimeType:'image/png',data:'aGVsbG8='}},
+    {fileData:{mimeType:'image/png',fileUri:'https://example.com/image.png'}}
+  ]}]});
+  assert.deepEqual(chat.map(m => m.image.remote), [true,false,true]);
+});
+
+test('Images survive Responses, Anthropic and multipart Chat Completions streams', () => {
+  const image = {type:'image_url',image_url:{url:png}};
+  const streams = [
+    [{type:'response.output_item.done',output_index:0,item:{role:'assistant',content:[image]}},{type:'response.completed',response:{output:[]}}],
+    [{type:'message_start',message:{role:'assistant'}},{type:'content_block_start',index:0,content_block:{type:'image',source:{type:'base64',media_type:'image/png',data:'aGVsbG8='}}}],
+    [{choices:[{index:0,delta:{content:'Before'}}]},{choices:[{index:0,delta:{content:[image]}}]},{choices:[{index:0,delta:{content:'After'}}]}]
+  ];
+  for (const stream of streams) {
+    const chat = messages(consolidate(stream));
+    assert.equal(chat.filter(m => m.image).length, 1);
+    assert.equal(chat.find(m => m.image).image.src, png);
+    assert.ok(chat.every(m => m.role === 'assistant'));
+  }
+});
+
+test('Responses image generation results render as generated images', () => {
+  for (const outputFormat of [undefined,'png','jpeg','jpg','webp']) {
+    const item = {id:'ig_1',type:'image_generation_call',status:'completed',result:'aGVsbG8='};
+    if (outputFormat) item.output_format = outputFormat;
+    const chat = messages({output:[item]});
+    assert.equal(chat.length, 1);
+    assert.equal(chat[0].role, 'assistant');
+    assert.equal(chat[0].label, 'Generated image');
+    assert.equal(chat[0].id, 'ig_1');
+    assert.equal(chat[0].image.remote, false);
+    assert.equal(chat[0].image.src, 'data:image/' + (outputFormat === 'jpg' ? 'jpeg' : outputFormat || 'png') + ';base64,aGVsbG8=');
+  }
+});
+
+test('Incomplete or unsupported image generation output stays inspectable', () => {
+  const incomplete = messages({output:[{type:'image_generation_call',status:'in_progress'}]});
+  assert.match(incomplete[0].text, /unavailable/);
+  const unsupported = messages({output:[{type:'image_generation_call',output_format:'svg+xml',result:'aGVsbG8='}]});
+  assert.match(unsupported[0].text, /unavailable/);
 });
 
 test('Raw exchange separates API retries and errors from the client exchange', () => {

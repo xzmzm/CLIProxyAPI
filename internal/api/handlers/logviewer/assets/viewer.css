@@ -253,6 +253,9 @@ dialog::backdrop { background: #2d2a2673; backdrop-filter: blur(3px); }
 .markdown-body th, .markdown-body td { border-color: var(--border); }
 .markdown-body th { color: var(--muted); background: var(--bg-tertiary); }
 .attachment-placeholder { color: var(--muted); border-color: var(--border-hover); }
+.chat-image { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.chat-image img { display: block; max-width: 100%; max-height: 70vh; object-fit: contain; border: 1px solid var(--border); border-radius: 8px; }
+.chat-image figcaption { color: var(--muted); font-size: .8rem; overflow-wrap: anywhere; }
 .raw-tabs { border-color: var(--border); }
 .raw-text { color: var(--text-primary); }
 @media (max-width: 900px) {

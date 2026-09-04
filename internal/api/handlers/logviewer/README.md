@@ -13,8 +13,13 @@ after updating its source.
   headings, lists, emphasis, tables, blockquotes, task lists, links, and fenced code.
   Role-colored message cards distinguish right-aligned users from assistants and
   instruction blocks. Tool calls/results retain literal payload formatting. Long
-  content is rendered on expansion. Attachments are represented as text; logged HTML
-  and remote images are never executed or fetched. Link destinations remain visible;
+  content is rendered on expansion. Structured image attachments in Responses,
+  Anthropic, Chat Completions, and Gemini content render inline, including Responses
+  image-generation results and images in tool results. Embedded raster images load
+  lazily; HTTP(S) images have a **Load
+  external image** button and send no referrer. Unsupported or missing image sources
+  remain available in Tree and Raw. Logged HTML stays inert, and Markdown images
+  remain placeholders. Link destinations remain visible;
   HTTP(S) and email links are clickable, while relative or unsafe targets are inert.
   Markdown uses locally bundled Marked and DOMPurify with a restricted tag/URL allowlist.
 - **Tree → API (upstream)** (default) shows expandable upstream request and response

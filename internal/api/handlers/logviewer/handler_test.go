@@ -190,6 +190,9 @@ func TestLogViewerAssetsAndMalformedLog(t *testing.T) {
 		if response.Code != 200 || response.Body.Len() == 0 || !strings.Contains(response.Header().Get("Content-Security-Policy"), "frame-ancestors 'none'") {
 			t.Fatalf("missing embedded asset or security policy: %s", path)
 		}
+		if !strings.Contains(response.Header().Get("Content-Security-Policy"), "img-src data: https: http:;") {
+			t.Fatalf("image attachments blocked by security policy: %s", path)
+		}
 	}
 	name := "error-v1-responses-2026-09-03T100000-error.log"
 	fixture(t, dir, name, "<script>alert('untrusted')</script>\npartial file")

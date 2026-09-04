@@ -5,6 +5,27 @@
   const array = value => Array.isArray(value) ? value : value == null ? [] : [value];
   const pretty = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
+  function imageSource(value) {
+    const source = value.source || value.inlineData || value.fileData;
+    let url = typeof value.image_url === 'string' ? value.image_url : value.image_url?.url;
+    if (value.type === 'image_generation_call' && typeof value.result === 'string') {
+      const format = String(value.output_format || 'png').toLowerCase().replace('jpg', 'jpeg');
+      url = 'data:image/' + format + ';base64,' + value.result;
+    }
+    if (source) {
+      url = source.url || source.fileUri;
+      if (typeof source.data === 'string') url = 'data:' + (source.media_type || source.mimeType) + ';base64,' + source.data;
+    }
+    if (typeof url !== 'string') return;
+    // Only passive raster formats may be embedded; never interpret logged markup.
+    if (/^data:image\/(?:png|jpeg|jpg|gif|webp|avif);base64,[a-z0-9+/=\s]+$/i.test(url)) return {src:url, remote:false};
+    if (!/^https?:\/\//i.test(url)) return;
+    try {
+      const parsed = new URL(url);
+      if (!parsed.username && !parsed.password) return {src:parsed.href, remote:true};
+    } catch { /* Keep malformed attachments available in Tree and Raw. */ }
+  }
+
   function frames(text) {
     const single = json(text.trim());
     if (single !== undefined) return array(single);
@@ -80,7 +101,13 @@
         const target = choices.get(index) || {index, message:{role:'assistant', content:''}};
         if (choice.message) target.message = choice.message;
         const delta = choice.delta || {};
-        target.message.content += delta.content || '';
+        if (Array.isArray(delta.content)) {
+          if (!Array.isArray(target.message.content)) target.message.content = target.message.content ? [{type:'text', text:target.message.content}] : [];
+          target.message.content.push(...delta.content);
+        } else if (delta.content) {
+          if (Array.isArray(target.message.content)) target.message.content.push({type:'text', text:delta.content});
+          else target.message.content += delta.content;
+        }
         if (delta.reasoning_content) target.message.reasoning_content = (target.message.reasoning_content || '') + delta.reasoning_content;
         for (const tool of delta.tool_calls || []) {
           target.message.tool_calls ||= [];
@@ -155,6 +182,13 @@
   function messages(payload, fallback = 'assistant') {
     const result = [];
     const add = (role, text, label, id) => { if (text != null && text !== '') result.push({role, text:pretty(text), label:label || role, id}); };
+    function toolResult(content, label, id) {
+      if (Array.isArray(content) && content.some(part => ['image','input_image','image_url'].includes(part?.type) || part?.inlineData || part?.fileData)) {
+        const start = result.length;
+        item(content, 'tool');
+        for (const message of result.slice(start)) { message.label = label; message.id = id; }
+      } else add('tool', content, label, id);
+    }
     function item(value, role = fallback) {
       if (value == null) return;
       if (typeof value === 'string') { add(role, value); return; }
@@ -166,15 +200,18 @@
         add('tool-call', json(tool.arguments) ?? tool.arguments ?? tool.input ?? tool.args ?? '', 'Tool call · ' + (tool.name || 'function'), tool.call_id || tool.id);
       } else if (value.type === 'function_call_output' || value.type === 'tool_result' || value.functionResponse) {
         const tool = value.functionResponse || value;
-        add('tool', tool.output ?? tool.content ?? tool.response, 'Tool result' + (tool.name ? ' · ' + tool.name : ''), tool.call_id || tool.tool_use_id);
+        toolResult(tool.output ?? tool.content ?? tool.response, 'Tool result' + (tool.name ? ' · ' + tool.name : ''), tool.call_id || tool.tool_use_id);
       } else if (value.type === 'reasoning' || value.type === 'thinking' || value.type === 'redacted_thinking') {
         add('reasoning', value.thinking || value.summary?.map(s => s.text).join('\n') || value.text || '[Encrypted or redacted reasoning]', 'Reasoning');
-      } else if (value.type === 'image_url' || value.type === 'input_image' || value.type === 'image' || value.inlineData || value.fileData) {
-        add(role, '[Image / attachment — inspect Tree or Raw view]', 'Attachment');
+      } else if (value.type === 'image_url' || value.type === 'input_image' || value.type === 'image' || value.type === 'image_generation_call' || value.inlineData || value.fileData) {
+        const image = imageSource(value);
+        if (image) result.push({role, text:'', label:value.type === 'image_generation_call' ? 'Generated image' : role, id:value.id, image});
+        else add(role, '[Image / attachment unavailable — inspect Tree or Raw view]', 'Attachment');
       } else if (value.text != null || value.type === 'refusal') {
         add(role, value.text ?? value.refusal);
       } else if (role === 'tool') {
-        add('tool', value.content, 'Tool result' + (value.name ? ' · ' + value.name : ''), value.tool_call_id);
+        if (value.content != null) toolResult(value.content, 'Tool result' + (value.name ? ' · ' + value.name : ''), value.tool_call_id);
+        else add('tool', value, 'Tool result');
       } else if (value.content != null || value.parts != null) {
         item(value.content ?? value.parts, role);
       } else if (!value.tool_calls && !value.reasoning_content) {
