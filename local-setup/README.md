@@ -1,4 +1,58 @@
-# Local Codex API setup on Windows
+# Local Codex API setup
+
+## macOS
+
+Run these commands from the checkout root. Install Go 1.26 or newer using
+`brew install go`. The helper also requires `jq` and `python3`; install them
+with `brew install jq python` if needed. Python detaches the server
+from the launching terminal so closing it does not stop the proxy.
+
+```bash
+./local-setup/proxy.sh init
+./local-setup/proxy.sh build
+./local-setup/proxy.sh start
+./local-setup/proxy.sh status
+```
+
+`init` generates two distinct random keys, creates private `config.yaml` and
+`local-setup/credentials.json` files, and restricts access to the auth and log
+directories. It refuses to overwrite either configuration file. The proxy binds
+to `127.0.0.1:8317`. Configuration, credentials, auth tokens, logs, and the binary
+are ignored by Git.
+
+Sign in to enable upstream model requests:
+
+```bash
+./local-setup/proxy.sh login
+# If browser callback login fails:
+./local-setup/proxy.sh devicelogin
+./local-setup/proxy.sh status
+./local-setup/proxy.sh test
+# Or: ./local-setup/proxy.sh test MODEL_FROM_STATUS
+```
+
+Complete sign-in in your browser and leave the login command running until it
+reports success. A fresh setup can serve the local UI before any account is
+connected; its model list will be empty until a provider is configured.
+
+- Request log viewer: <http://127.0.0.1:8317/logs>
+- Management panel: <http://127.0.0.1:8317/management.html>
+- Application API base URL: `http://127.0.0.1:8317/v1`
+- Keys: `api_key` and `management_key` in `local-setup/credentials.json`.
+
+To copy the management key without displaying it in terminal output:
+
+```bash
+jq -j .management_key local-setup/credentials.json | pbcopy
+```
+
+Start runs in the background and prints the path to a fresh server log under
+`local-setup/run-*`. It does not configure automatic startup after reboot.
+Use `./local-setup/proxy.sh stop` to stop it. After source updates, run `stop`,
+`build`, then `start`. Actions are case-insensitive and the helper also works
+when invoked by its absolute path from another directory.
+
+## Windows
 
 Run commands below from the root of your checkout. This wrapper is for Windows,
 binds the proxy to this PC, and uses port 8317.

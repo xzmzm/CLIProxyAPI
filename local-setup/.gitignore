@@ -5,6 +5,7 @@
 !README.md
 !proxy.cmd
 !proxy.ps1
+!proxy.sh
 !go-env.ps1
 !codex-provider.toml
 !credentials.example.json
