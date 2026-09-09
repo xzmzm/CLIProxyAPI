@@ -71,7 +71,7 @@
     for (const e of events) {
       if (!e || typeof e !== 'object') continue;
       if (e.error) error = e.error;
-      if (e.usage) usage = e.usage;
+      usage = e.usage ?? e.response?.usage ?? usage;
       if (e.response) envelope = {...envelope, ...e.response};
       const key = e.output_index ?? e.item_id ?? 0;
       if (e.type === 'response.output_item.added' || e.type === 'response.output_item.done') items.set(key, e.item);

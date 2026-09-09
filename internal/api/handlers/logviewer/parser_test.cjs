@@ -24,6 +24,7 @@ test('Responses reconstructs output items when the completed upstream envelope i
   assert.equal(response.output.length, 2);
   assert.deepEqual(response.output.map(item => item.type), ['reasoning','message']);
   assert.equal(response.output[1].content[0].text, 'Hello');
+  assert.equal(response.usage.output_tokens, 1);
 });
 test('Incomplete Responses stream preserves text and tools', () => {
   const response = consolidate([{type:'response.output_text.delta', output_index:0, delta:'Hel'}, {type:'response.output_text.delta',output_index:0,delta:'lo'}, {type:'response.output_item.added',output_index:1,item:{type:'function_call',name:'test',call_id:'call-1',arguments:''}}, {type:'response.function_call_arguments.delta',output_index:1,delta:'{"a":1}'}]);
