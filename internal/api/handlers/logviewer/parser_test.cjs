@@ -208,6 +208,41 @@ test('Images API responses honor output_format and reject unsupported sources', 
   assert.equal(embeddings.length, 0);
 });
 
+test('Images edits render multipart prompt, upstream input images, and generated output', () => {
+  const form = [
+    '----formdata-undici-082026075838',
+    'Content-Disposition: form-data; name="model"', '', 'gpt-image-1',
+    '----formdata-undici-082026075838',
+    'Content-Disposition: form-data; name="prompt"', '', 'Extend the reference scene',
+    '----formdata-undici-082026075838',
+    'Content-Disposition: form-data; name="image"; filename="input.jpg"',
+    'Content-Type: image/jpeg', '', 'raw binary bytes',
+    '----formdata-undici-082026075838--', ''
+  ].join('\r\n');
+  const parsed = parse([
+    {name:'REQUEST BODY', text:form},
+    {name:'API REQUEST 1', text:'Upstream URL: https://provider.example\r\n\r\nBody:\r\n{"model":"gpt-image-1","prompt":"Extend the reference scene","images":[{"image_url":"data:image/jpeg;base64,aGVsbG8="}]}\r\n'},
+    {name:'RESPONSE', text:'Status: 200\nContent-Type: application/json\n\n{"created":1,"output_format":"png","data":[{"b64_json":"aGVsbG8=","generation_id":"g1"}]}\n'}
+  ]);
+  assert.deepEqual(parsed.chat.map(m => m.label), ['Prompt','Input image','Generated image']);
+  assert.equal(parsed.chat[0].role, 'user');
+  assert.equal(parsed.chat[0].text, 'Extend the reference scene');
+  assert.deepEqual(parsed.chat[1].image, {src:'data:image/jpeg;base64,aGVsbG8=', remote:false});
+  assert.deepEqual(parsed.chat[2].image, {src:'data:image/png;base64,aGVsbG8=', remote:false, caption:'Generated image'});
+  assert.equal(parsed.request.model, 'gpt-image-1');
+  assert.deepEqual(parsed.request.formFiles, [{name:'image', filename:'input.jpg', contentType:'image/jpeg'}]);
+});
+
+test('Images edits without recoverable input images stay inspectable', () => {
+  const form = '----b\r\nContent-Disposition: form-data; name="prompt"\r\n\r\nRetouch\r\n----b\r\nContent-Disposition: form-data; name="image"; filename="in.png"\r\n\r\nbinary\r\n----b--\r\n';
+  const parsed = parse([
+    {name:'REQUEST BODY', text:form},
+    {name:'RESPONSE', text:'Status: 500\n\n{"error":{"message":"quota exceeded"}}\n'}
+  ]);
+  assert.deepEqual(parsed.chat.map(m => m.label), ['Prompt','Input image','Error']);
+  assert.match(parsed.chat[1].text, /in\.png .*unavailable/);
+});
+
 test('Raw exchange separates API retries and errors from the client exchange', () => {
   const sections = [
     {name:'REQUEST INFO',text:'client metadata\n'},

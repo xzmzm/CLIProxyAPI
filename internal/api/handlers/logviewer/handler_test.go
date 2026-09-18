@@ -223,3 +223,18 @@ func TestLogViewerCRLFAndWebsocket(t *testing.T) {
 		t.Fatal(response.Body.String())
 	}
 }
+
+func TestLogViewerMultipartModelSummary(t *testing.T) {
+	dir := t.TempDir()
+	name := "v1-images-edits-2026-09-03T100000-edit.log"
+	body := "=== REQUEST INFO ===\nURL: /v1/images/edits\nMethod: POST\n\n\n=== REQUEST BODY ===\n--boundary\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-image-1\r\n--boundary\r\nContent-Disposition: form-data; name=\"image\"; filename=\"input.jpg\"\r\nContent-Type: image/jpeg\r\n\r\nbinary\r\n--boundary--\r\n"
+	fixture(t, dir, name, body)
+	stamp := time.Date(2026, 9, 3, 10, 0, 0, 0, time.UTC)
+	if err := os.Chtimes(filepath.Join(dir, name), stamp, stamp); err != nil {
+		t.Fatal(err)
+	}
+	response := request(router(dir), "/logs/api/entries")
+	if !strings.Contains(response.Body.String(), `"model":"gpt-image-1"`) {
+		t.Fatal("multipart model field must be summarized: ", response.Body.String())
+	}
+}

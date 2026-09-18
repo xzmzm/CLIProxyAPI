@@ -15,9 +15,11 @@ after updating its source.
   instruction blocks. Tool calls/results retain literal payload formatting. Long
   content is rendered on expansion. Structured image attachments in Responses,
   Anthropic, Chat Completions, and Gemini content render inline, including Responses
-  image-generation results and images in tool results. Images API
-  (`/v1/images/generations`) logs render the prompt, revised prompts, and each
-  generated `b64_json` or URL image inline. Embedded raster images load
+  image-generation results and images in tool results. Images API logs render
+  inline: `/v1/images/generations` shows the prompt, revised prompts, and each
+  generated `b64_json` or URL image, while multipart `/v1/images/edits` requests
+  show the prompt with input images recovered from the mirrored upstream request
+  (logged form binaries themselves are not renderable). Embedded raster images load
   lazily; HTTP(S) images have a **Load
   external image** button and send no referrer. Unsupported or missing image sources
   remain available in Tree and Raw. Logged HTML stays inert, and Markdown images

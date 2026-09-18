@@ -60,6 +60,45 @@
     return split >= 0 ? normalized.slice(split + 2).trim() : normalized.trim();
   }
 
+  // Decode readable multipart/form-data fields; binary file parts are only named.
+  function formData(text) {
+    const normalized = text.replace(/\r\n/g, '\n');
+    const boundary = /^--(\S+)[ \t]*\n/.exec(normalized);
+    if (!boundary) return;
+    const fields = {}, files = [];
+    for (const part of normalized.split('\n--' + boundary[1])) {
+      const segment = part.startsWith('\n') ? part.slice(1) : part;
+      const split = segment.indexOf('\n\n');
+      // The first chunk opens with the boundary line; the closing marker and
+      // binary garbage carry no blank-line header separator.
+      if (split < 0) continue;
+      const headers = segment.slice(0, split);
+      const disposition = /Content-Disposition: form-data;([^\n]*)/i.exec(headers);
+      const name = /name="([^"]*)"/.exec(disposition?.[1] || '')?.[1];
+      if (!name) continue;
+      const filename = /filename="([^"]*)"/.exec(disposition[1])?.[1];
+      if (filename != null) files.push({name, filename, contentType:/Content-Type: ([^\s;]+)/i.exec(headers)?.[1]});
+      else fields[name] = segment.slice(split + 2).trim();
+    }
+    return Object.keys(fields).length || files.length ? {fields, files} : undefined;
+  }
+
+  // Images API edits arrive as multipart with raw binary parts; the mirrored
+  // upstream JSON request carries the same prompt plus lossless input images.
+  function formRequest(form, sections) {
+    const request = {model: form.fields.model, prompt: form.fields.prompt, formFiles: form.files};
+    for (const section of sections) {
+      if (!/^API REQUEST(?: \d+)?$/.test(section.name)) continue;
+      const body = structuredSection(section).body;
+      if (body && typeof body === 'object' && !Array.isArray(body) && typeof body.prompt === 'string' && Array.isArray(body.images)) {
+        if (request.prompt == null) request.prompt = body.prompt;
+        request.images = body.images;
+        break;
+      }
+    }
+    return request;
+  }
+
   function consolidate(events) {
     if (events.length === 1 && !events[0]?.type?.startsWith('response.') && !events[0]?.choices?.[0]?.delta) return events[0];
     if (events.some(e => Array.isArray(e?.candidates) || Array.isArray(e?.response?.candidates))) return consolidateGemini(events);
@@ -242,6 +281,15 @@
     if (payload.system) item(payload.system, 'system');
     if (payload.systemInstruction) item(payload.systemInstruction.parts, 'system');
     if (typeof payload.prompt === 'string') add('user', payload.prompt, 'Prompt');
+    if (Array.isArray(payload.images)) {
+      for (const value of payload.images) {
+        const image = imageSource(typeof value === 'string' ? {image_url: value} : value ?? {});
+        if (image) result.push({role:'user', text:'', label:'Input image', id:value?.id, image});
+        else add('user', '[Input image unavailable — inspect Tree or Raw view]', 'Input image');
+      }
+    } else if (payload.formFiles?.length) {
+      for (const file of payload.formFiles) add('user', '[Input image ' + (file.filename || file.name || '') + ' unavailable — inspect Tree or Raw view]', 'Input image');
+    }
     if (payload.messages) item(payload.messages, 'user');
     if (payload.input != null) item(payload.input, 'user');
     if (payload.contents) item(payload.contents, 'user');
@@ -258,10 +306,11 @@
   function parse(sections) {
     const section = name => sections.find(s => s.name === name)?.text || '';
     const requestText = section('REQUEST BODY').trim();
+    const form = formData(requestText);
     const responseText = responseBody(section('RESPONSE'));
     const timeline = frames(section('WEBSOCKET TIMELINE'));
     const requestFrames = timeline.filter(e => e.type === 'response.create');
-    const requests = requestText ? frames(requestText) : requestFrames;
+    const requests = requestText ? form ? [formRequest(form, sections)] : frames(requestText) : requestFrames;
     const request = requests.length === 1 ? requests[0] : requests;
     const events = responseText ? frames(responseText) : timeline.filter(e => e.type !== 'response.create');
     const response = consolidate(events);

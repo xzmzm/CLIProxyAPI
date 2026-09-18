@@ -56,6 +56,26 @@ func header(text, name string) string {
 	return ""
 }
 
+// formValue extracts a single-line multipart/form-data field value from a
+// logged request body. Binary file parts are skipped.
+func formValue(text, name string) string {
+	for _, part := range strings.Split(text, "Content-Disposition: form-data; ") {
+		head, rest, found := strings.Cut(part, "\r\n\r\n")
+		if !found {
+			head, rest, found = strings.Cut(part, "\n\n")
+		}
+		if !found {
+			continue
+		}
+		if !strings.HasPrefix(head, `name="`+name+`"`) || strings.Contains(head, `filename="`) {
+			continue
+		}
+		value, _, _ := strings.Cut(rest, "\n")
+		return strings.TrimSuffix(value, "\r")
+	}
+	return ""
+}
+
 func basicEntry(info os.FileInfo) Entry {
 	stem := strings.TrimSuffix(info.Name(), ".log")
 	id := stem[strings.LastIndex(stem, "-")+1:]
@@ -78,6 +98,9 @@ func summarize(info os.FileInfo, sections []Section) Entry {
 			}
 		case "REQUEST BODY":
 			entry.Model = gjson.Get(section.Text, "model").String()
+			if entry.Model == "" {
+				entry.Model = formValue(section.Text, "model")
+			}
 			if gjson.Get(section.Text, "stream").Bool() && entry.Transport != "WebSocket" {
 				entry.Transport = "Stream"
 			}
