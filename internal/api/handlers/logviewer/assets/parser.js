@@ -5,13 +5,14 @@
   const array = value => Array.isArray(value) ? value : value == null ? [] : [value];
   const pretty = value => typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
+  const dataURI = (data, format) => 'data:image/' + String(format || 'png').toLowerCase().replace('jpg', 'jpeg') + ';base64,' + data;
+
   function imageSource(value) {
     const source = value.source || value.inlineData || value.fileData;
     let url = typeof value.image_url === 'string' ? value.image_url : value.image_url?.url;
-    if (value.type === 'image_generation_call' && typeof value.result === 'string') {
-      const format = String(value.output_format || 'png').toLowerCase().replace('jpg', 'jpeg');
-      url = 'data:image/' + format + ';base64,' + value.result;
-    }
+    if (value.type === 'image_generation_call' && typeof value.result === 'string') url = dataURI(value.result, value.output_format);
+    if (typeof value.b64_json === 'string') url = dataURI(value.b64_json, value.output_format);
+    if (url == null && typeof value.url === 'string') url = value.url;
     if (source) {
       url = source.url || source.fileUri;
       if (typeof source.data === 'string') url = 'data:' + (source.media_type || source.mimeType) + ';base64,' + source.data;
@@ -189,6 +190,16 @@
         for (const message of result.slice(start)) { message.label = label; message.id = id; }
       } else add('tool', content, label, id);
     }
+    // Images API results carry base64 or URL payloads with optional revised prompts.
+    function imageResult(value, format) {
+      if (!value || typeof value !== 'object') return;
+      if (value.revised_prompt) add('assistant', value.revised_prompt, 'Revised prompt');
+      const image = imageSource({...value, output_format: value.output_format ?? format});
+      if (image) {
+        if (!image.remote) image.caption = 'Generated image';
+        result.push({role: 'assistant', text: '', label: 'Generated image', id: value.generation_id, image});
+      } else if (value.b64_json != null || value.url != null) add('assistant', '[Image / attachment unavailable — inspect Tree or Raw view]', 'Attachment');
+    }
     function item(value, role = fallback) {
       if (value == null) return;
       if (typeof value === 'string') { add(role, value); return; }
@@ -205,8 +216,10 @@
         add('reasoning', value.thinking || value.summary?.map(s => s.text).join('\n') || value.text || '[Encrypted or redacted reasoning]', 'Reasoning');
       } else if (value.type === 'image_url' || value.type === 'input_image' || value.type === 'image' || value.type === 'image_generation_call' || value.inlineData || value.fileData) {
         const image = imageSource(value);
-        if (image) result.push({role, text:'', label:value.type === 'image_generation_call' ? 'Generated image' : role, id:value.id, image});
-        else add(role, '[Image / attachment unavailable — inspect Tree or Raw view]', 'Attachment');
+        if (image) {
+          if (value.type === 'image_generation_call' && !image.remote) image.caption = 'Generated image';
+          result.push({role, text:'', label:value.type === 'image_generation_call' ? 'Generated image' : role, id:value.id, image});
+        } else add(role, '[Image / attachment unavailable — inspect Tree or Raw view]', 'Attachment');
       } else if (value.text != null || value.type === 'refusal') {
         add(role, value.text ?? value.refusal);
       } else if (role === 'tool') {
@@ -228,6 +241,7 @@
     if (payload.instructions) item(payload.instructions, 'system');
     if (payload.system) item(payload.system, 'system');
     if (payload.systemInstruction) item(payload.systemInstruction.parts, 'system');
+    if (typeof payload.prompt === 'string') add('user', payload.prompt, 'Prompt');
     if (payload.messages) item(payload.messages, 'user');
     if (payload.input != null) item(payload.input, 'user');
     if (payload.contents) item(payload.contents, 'user');
@@ -235,6 +249,7 @@
     if (payload.content) item(payload.content, payload.role || fallback);
     if (payload.choices) payload.choices.forEach(c => item(c.message ?? c.text, 'assistant'));
     if (payload.candidates) payload.candidates.forEach(c => item(c.content, 'assistant'));
+    if (Array.isArray(payload.data)) payload.data.forEach(value => imageResult(value, payload.output_format));
     if (payload.error) add('error', payload.error, 'Error');
     if (!result.length && (payload.role || payload.type === 'function_call')) item(payload);
     return result;

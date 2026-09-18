@@ -184,6 +184,30 @@ test('Incomplete or unsupported image generation output stays inspectable', () =
   assert.match(unsupported[0].text, /unavailable/);
 });
 
+test('Images API prompt and generated images render in chat order', () => {
+  const parsed = parse([
+    {name:'REQUEST BODY', text:'{"model":"gpt-image-1","prompt":"A sunset over water","size":"1536x1024","n":1}'},
+    {name:'RESPONSE', text:'Status: 200\nContent-Type: application/json\n\n{"created":1789717882,"output_format":"png","data":[{"b64_json":"aGVsbG8=","generation_id":"g1"},{"url":"https://example.com/image.png"},{"revised_prompt":"A brighter sunset"}]}\n'}
+  ]);
+  assert.deepEqual(parsed.chat.map(m => m.label), ['Prompt','Generated image','Generated image','Revised prompt']);
+  assert.equal(parsed.chat[0].role, 'user');
+  assert.equal(parsed.chat[0].text, 'A sunset over water');
+  assert.deepEqual(parsed.chat[1].image, {src:'data:image/png;base64,aGVsbG8=', remote:false, caption:'Generated image'});
+  assert.equal(parsed.chat[1].id, 'g1');
+  assert.deepEqual(parsed.chat[2].image, {src:'https://example.com/image.png', remote:true});
+  assert.equal(parsed.chat[3].role, 'assistant');
+  assert.equal(parsed.chat[3].text, 'A brighter sunset');
+});
+
+test('Images API responses honor output_format and reject unsupported sources', () => {
+  assert.equal(messages({output_format:'jpeg', data:[{b64_json:'aGVsbG8='}]}).pop().image.src, 'data:image/jpeg;base64,aGVsbG8=');
+  assert.equal(messages({output_format:'jpg', data:[{b64_json:'aGVsbG8='}]}).pop().image.src, 'data:image/jpeg;base64,aGVsbG8=');
+  const unsupported = messages({output_format:'svg+xml', data:[{b64_json:'aGVsbG8='}]});
+  assert.equal(unsupported.pop().image, undefined);
+  const embeddings = messages({data:[{embedding:[0.1,0.2], index:0}], model:'text-embedding-3-small'});
+  assert.equal(embeddings.length, 0);
+});
+
 test('Raw exchange separates API retries and errors from the client exchange', () => {
   const sections = [
     {name:'REQUEST INFO',text:'client metadata\n'},

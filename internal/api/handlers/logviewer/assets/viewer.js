@@ -91,7 +91,7 @@ function folded(title, child, open = false) {
 
 function renderImage(image) {
   const figure = element('figure', null, 'chat-image');
-  const caption = element('figcaption', image.remote ? 'External image · ' + new URL(image.src).host : 'Attached image');
+  const caption = element('figcaption', image.remote ? 'External image · ' + new URL(image.src).host : image.caption || 'Attached image');
   const load = () => {
     const img = element('img');
     img.alt = 'Chat image attachment';
