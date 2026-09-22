@@ -46,6 +46,15 @@ body:has(dialog[open]) { overflow: hidden; }
 .message.error { background: #fff6f5; border-color: #efdad7; }
 .message .call-id { margin: 0; color: #65738a; font-size: .75rem; word-break: break-all; text-align: right; }
 .message.tool-call .call-id { color: #a9bbd4; }
+.message.tool .message-header, .message.tool-call .message-header { flex-wrap: wrap; }
+.newline-toggle {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+  font-size: .75rem; white-space: nowrap; cursor: pointer;
+}
+.newline-toggle input {
+  min-width: 0; width: 14px; height: 14px; padding: 0; margin: 0;
+  flex-shrink: 0; accent-color: var(--primary); cursor: pointer;
+}
 .tool-payload { font-size: .85rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 440px; overflow: auto; }
 .message.tool .tool-payload { padding: 14px; background: #ffffffb3; border: 1px solid #e5dff0; border-radius: 8px; color: #45526b; }
 .markdown-body { font-size: 1rem; line-height: 1.75; color: var(--chat-ink); overflow-wrap: anywhere; white-space: normal; }

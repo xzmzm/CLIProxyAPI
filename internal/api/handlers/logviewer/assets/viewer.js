@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const state = {page:1, pages:1, view:'chat', rawSource:'api', treeSource:'api', selected:null, parsed:null, listVersion:0, detailVersion:0};
+const state = {page:1, pages:1, view:'chat', rawSource:'api', treeSource:'api', selected:null, parsed:null, toolNewlines:new Set(), listVersion:0, detailVersion:0};
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text != null) node.textContent = text;
@@ -66,6 +66,7 @@ async function openDetail(entry) {
   const version = ++state.detailVersion;
   state.selected = entry;
   state.parsed = null;
+  state.toolNewlines.clear();
   $('detail-meta').textContent = entry.id + ' · ' + (entry.method || '') + ' ' + (entry.url || entry.name);
   $('download').href = downloadURL(entry.name);
   $('download').download = entry.name;
@@ -113,6 +114,12 @@ function renderImage(image) {
   return figure;
 }
 
+function formatToolText(text, renderNewlines) {
+  if (!renderNewlines) return text;
+  // Preserve escaped backslashes, including JSON-encoded Windows paths.
+  return text.replace(/\\\\|\\r\\n|\\[rn]/g, escape => escape === '\\\\' ? escape : '\n');
+}
+
 function renderChat() {
   const node = element('div', null, 'chat');
   const entry = state.selected;
@@ -144,18 +151,39 @@ function renderChat() {
     more.remove();
     const end = Math.min(shown + 100, messages.length);
     for (; shown < end; shown++) {
+      const index = shown;
       const message = messages[shown];
       const role = ['user','assistant','system','developer','tool','tool-call','reasoning','error'].includes(message.role) ? message.role : 'assistant';
+      const isTool = role === 'tool' || role === 'tool-call';
+      let payload;
       const block = element('article', null, 'message ' + role);
       const names = {system:'System prompt', developer:'Developer prompt', user:'User', assistant:'Assistant', tool:'Tool result', 'tool-call':'Tool call', reasoning:'Reasoning', error:'Error'};
       const title = message.label && message.label !== message.role ? message.label : names[role];
       const heading = element('header', null, 'message-header');
       heading.append(element('h3', title));
+      if (isTool && !message.image) {
+        const label = element('label', null, 'newline-toggle');
+        label.title = 'Display escaped \\r and \\n sequences as line breaks';
+        const toggle = element('input');
+        toggle.type = 'checkbox';
+        toggle.checked = state.toolNewlines.has(index);
+        toggle.addEventListener('change', () => {
+          if (toggle.checked) state.toolNewlines.add(index);
+          else state.toolNewlines.delete(index);
+          if (payload) payload.textContent = formatToolText(message.text, toggle.checked);
+        });
+        label.append(toggle, document.createTextNode('Render newlines'));
+        heading.append(label);
+      }
       if (message.id) heading.append(element('span', message.id, 'call-id mono'));
       block.append(heading);
       const body = element('div', null, 'message-body');
-      const isTool = role === 'tool' || role === 'tool-call';
-      const content = () => message.image ? renderImage(message.image) : isTool ? element('pre', message.text, 'tool-payload') : LogMarkdown.render(message.text);
+      const content = () => {
+        if (message.image) return renderImage(message.image);
+        if (!isTool) return LogMarkdown.render(message.text);
+        payload = element('pre', formatToolText(message.text, state.toolNewlines.has(index)), 'tool-payload');
+        return payload;
+      };
       // Render long content on expansion, not while building every collapsed message.
       if (message.text.length > 12000 || role === 'reasoning') {
         const container = element('div');

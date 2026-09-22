@@ -81,6 +81,90 @@ test('Viewer stylesheet carries the page and chat surface selectors', () => {
 });
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve));
+test('Tool newline toggles are independent, reversible, and preserve original log data', async t => {
+  const html = fs.readFileSync(path.join(__dirname, 'assets/index.html'), 'utf8');
+  const dom = new JSDOM(html, {url:'http://localhost:8317/logs', runScripts:'outside-only'});
+  t.after(() => dom.window.close());
+  const win = dom.window;
+  const doc = win.document;
+  win.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
+  const entry = {name:'v1-responses-2026-09-03T100000-first.log',id:'first',time:'2026-09-03T10:00:00Z',method:'POST',url:'/v1/responses',model:'test',transport:'HTTP',status:200,duration:1,size:1000};
+  const second = {...entry, name:'v1-responses-2026-09-03T100000-second.log', id:'second'};
+  const args = {code:'first\r\nsecond\nthird\rfourth',path:String.raw`C:\new\report.txt`,literal:String.raw`\n`,html:'<script>unsafe()</script>'};
+  const originalArgs = JSON.stringify(args, null, 2);
+  const renderedArgs = [
+    '{', '  "code": "first', 'second', 'third', 'fourth",',
+    String.raw`  "path": "C:\\new\\report.txt",`,
+    String.raw`  "literal": "\\n",`,
+    '  "html": "<script>unsafe()</script>"', '}'
+  ].join('\n');
+  const output = String.raw`first\r\nsecond\nthird\rfourth\nC:\\new\\report.txt\n<script>unsafe()</script>` + '\nalready\nsplit';
+  const renderedOutput = ['first','second','third','fourth',String.raw`C:\\new\\report.txt`,'<script>unsafe()</script>','already','split'].join('\n');
+  const longArgs = 'x'.repeat(12001) + String.raw`\nend`;
+  const sections = [{name:'REQUEST BODY',text:JSON.stringify({input:[
+    {role:'user',content:String.raw`user\ntext`},
+    {type:'function_call',name:'run',arguments:JSON.stringify(args),call_id:'c1'},
+    {type:'function_call_output',call_id:'c1',output},
+    {type:'function_call',name:'long',arguments:longArgs,call_id:'c2'},
+    {type:'function_call_output',call_id:'c2',output:[{type:'input_image',image_url:'data:image/png;base64,aGVsbG8='}]}
+  ]})}];
+  win.fetch = async url => ({ok:true,json:async () => String(url).includes('?') ? {entries:[entry,second],page:1,pages:1,total:2} : {entry:String(url).endsWith(second.name) ? second : entry,sections}});
+  for (const file of ['vendor/marked.umd.js','vendor/purify.min.js','parser.js','markdown.js','viewer.js']) {
+    win.eval(fs.readFileSync(path.join(__dirname, 'assets', file), 'utf8'));
+  }
+  await nextTurn();
+  doc.querySelector('#entries button').click();
+  await nextTurn();
+  let [call, longCall] = doc.querySelectorAll('.message.tool-call');
+  let result = doc.querySelector('.message.tool');
+  assert.equal(doc.querySelectorAll('.newline-toggle input').length, 3);
+  assert.ok([...doc.querySelectorAll('.newline-toggle input')].every(toggle => !toggle.checked));
+  assert.equal(doc.querySelector('.message.user input'), null);
+  assert.equal(doc.querySelector('.chat-image').closest('.message').querySelector('input'), null);
+  assert.equal(call.querySelector('pre').textContent, originalArgs);
+  assert.equal(result.querySelector('pre').textContent, output);
+
+  call.querySelector('label').click();
+  assert.equal(call.querySelector('pre').textContent, renderedArgs);
+  assert.equal(result.querySelector('pre').textContent, output);
+  assert.equal(result.querySelector('input').checked, false);
+  assert.equal(longCall.querySelector('input').checked, false);
+  result.querySelector('input').click();
+  assert.equal(result.querySelector('pre').textContent, renderedOutput);
+  assert.equal(call.querySelector('script'), null);
+  assert.equal(result.querySelector('script'), null);
+  call.querySelector('input').click();
+  result.querySelector('input').click();
+  assert.equal(call.querySelector('pre').textContent, originalArgs);
+  assert.equal(result.querySelector('pre').textContent, output);
+
+  // A toggle set before expansion applies when the deferred payload is rendered.
+  longCall.querySelector('input').click();
+  assert.equal(longCall.querySelector('pre'), null);
+  const fold = longCall.querySelector('details');
+  fold.open = true;
+  fold.dispatchEvent(new win.Event('toggle'));
+  assert.equal(longCall.querySelector('pre').textContent, 'x'.repeat(12001) + '\nend');
+  longCall.querySelector('input').click();
+  assert.equal(longCall.querySelector('pre').textContent, longArgs);
+
+  call.querySelector('input').click();
+  doc.querySelector('#tab-raw').click();
+  doc.querySelector('#raw-tab-client').click();
+  assert.ok(doc.querySelector('#raw-exchange').textContent.includes(sections[0].text));
+  doc.querySelector('#tab-chat').click();
+  [call, longCall] = doc.querySelectorAll('.message.tool-call');
+  result = doc.querySelector('.message.tool');
+  assert.equal(call.querySelector('input').checked, true);
+  assert.equal(call.querySelector('pre').textContent, renderedArgs);
+  assert.equal(result.querySelector('input').checked, false);
+  assert.equal(result.querySelector('pre').textContent, output);
+  doc.querySelectorAll('#entries button')[1].click();
+  await nextTurn();
+  assert.ok([...doc.querySelectorAll('.newline-toggle input')].every(toggle => !toggle.checked));
+  assert.equal(doc.querySelector('.message.tool-call pre').textContent, originalArgs);
+});
+
 test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with keyboard navigation', async t => {
   const html = fs.readFileSync(path.join(__dirname, 'assets/index.html'), 'utf8');
   const dom = new JSDOM(html, {url:'http://localhost:8317/logs', runScripts:'outside-only'});

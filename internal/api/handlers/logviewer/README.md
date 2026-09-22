@@ -13,7 +13,10 @@ after updating its source.
   headings, lists, emphasis, tables, blockquotes, task lists, links, and fenced code.
   Role-colored message cards align users and client tool results to the right,
   assistants and tool calls to the left, and instruction blocks across the full
-  width. Tool calls/results retain literal payload formatting. Long
+  width. Tool calls/results retain literal payload formatting. Each text payload
+  has a **Render newlines** checkbox beside its call ID to display escaped `\r`,
+  `\n`, and `\r\n` as line breaks. It starts off, preserves escaped backslashes,
+  and keeps its setting across view changes until another log is opened. Long
   content is rendered on expansion. Structured image attachments in Responses,
   Anthropic, Chat Completions, and Gemini content render inline, including Responses
   image-generation results and images in tool results. Images API logs render
