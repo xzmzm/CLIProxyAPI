@@ -25,7 +25,8 @@ body:has(dialog[open]) { overflow: hidden; }
   border-radius: 50%; margin: 0 8px 2px 0; background: currentColor;
 }
 .message .message-body { padding: 12px 20px 20px; min-width: 0; }
-.message.user { align-self: flex-end; background: #edf4ff; border-color: #d3e1f7; }
+.message.user, .message.tool { align-self: flex-end; }
+.message.user { background: #edf4ff; border-color: #d3e1f7; }
 .message.user .message-header h3 { color: #365f9e; }
 .message.assistant { background: #fff; border-color: #e0e6ef; }
 .message.assistant .message-header h3 { color: #26755e; }
