@@ -1,6 +1,6 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const state = {page:1, pages:1, view:'chat', rawSource:'api', treeSource:'api', selected:null, parsed:null, toolNewlines:new Set(), listVersion:0, detailVersion:0};
+const state = {page:1, pages:1, view:'chat', rawSource:'api', treeSource:'api', selected:null, parsed:null, toolUnescaped:new Set(), listVersion:0, detailVersion:0};
 const element = (tag, text, className) => {
   const node = document.createElement(tag);
   if (text != null) node.textContent = text;
@@ -66,7 +66,7 @@ async function openDetail(entry) {
   const version = ++state.detailVersion;
   state.selected = entry;
   state.parsed = null;
-  state.toolNewlines.clear();
+  state.toolUnescaped.clear();
   $('detail-meta').textContent = entry.id + ' · ' + (entry.method || '') + ' ' + (entry.url || entry.name);
   $('download').href = downloadURL(entry.name);
   $('download').download = entry.name;
@@ -114,10 +114,16 @@ function renderImage(image) {
   return figure;
 }
 
-function formatToolText(text, renderNewlines) {
-  if (!renderNewlines) return text;
-  // Preserve escaped backslashes, including JSON-encoded Windows paths.
-  return text.replace(/\\\\|\\r\\n|\\[rn]/g, escape => escape === '\\\\' ? escape : '\n');
+function formatToolText(text, renderUnescaped) {
+  if (!renderUnescaped) return text;
+  const display = value => '@"' + value.replace(/\r\n?/g, '\n') + '"';
+  try { JSON.parse(text); }
+  catch {
+    // Plain-text results may contain escapes too. Decode once, leaving unknown escapes intact.
+    return display(text.replace(/\\(?:u[0-9a-fA-F]{4}|["\\/bfnrt])/g, escape => JSON.parse('"' + escape + '"')));
+  }
+  // Decode JSON string values while preserving keys, numbers, and the original layout.
+  return text.replace(/"(?:\\.|[^"\\])*"(\s*:)?/g, (token, key) => key ? token : display(JSON.parse(token)));
 }
 
 function renderChat() {
@@ -162,17 +168,17 @@ function renderChat() {
       const heading = element('header', null, 'message-header');
       heading.append(element('h3', title));
       if (isTool && !message.image) {
-        const label = element('label', null, 'newline-toggle');
-        label.title = 'Display escaped \\r and \\n sequences as line breaks';
+        const label = element('label', null, 'unescape-toggle');
+        label.title = 'Decode one layer of string escapes (line breaks, quotes, tabs, and backslashes). @"…" marks unescaped strings; this display is not JSON.';
         const toggle = element('input');
         toggle.type = 'checkbox';
-        toggle.checked = state.toolNewlines.has(index);
+        toggle.checked = state.toolUnescaped.has(index);
         toggle.addEventListener('change', () => {
-          if (toggle.checked) state.toolNewlines.add(index);
-          else state.toolNewlines.delete(index);
+          if (toggle.checked) state.toolUnescaped.add(index);
+          else state.toolUnescaped.delete(index);
           if (payload) payload.textContent = formatToolText(message.text, toggle.checked);
         });
-        label.append(toggle, document.createTextNode('Render newlines'));
+        label.append(toggle, document.createTextNode('Render unescaped'));
         heading.append(label);
       }
       if (message.id) heading.append(element('span', message.id, 'call-id mono'));
@@ -181,7 +187,7 @@ function renderChat() {
       const content = () => {
         if (message.image) return renderImage(message.image);
         if (!isTool) return LogMarkdown.render(message.text);
-        payload = element('pre', formatToolText(message.text, state.toolNewlines.has(index)), 'tool-payload');
+        payload = element('pre', formatToolText(message.text, state.toolUnescaped.has(index)), 'tool-payload');
         return payload;
       };
       // Render long content on expansion, not while building every collapsed message.

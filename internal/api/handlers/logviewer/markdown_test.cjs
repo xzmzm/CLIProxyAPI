@@ -81,7 +81,7 @@ test('Viewer stylesheet carries the page and chat surface selectors', () => {
 });
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve));
-test('Tool newline toggles are independent, reversible, and preserve original log data', async t => {
+test('Tool unescape toggles decode one layer, stay independent and reversible, and preserve original log data', async t => {
   const html = fs.readFileSync(path.join(__dirname, 'assets/index.html'), 'utf8');
   const dom = new JSDOM(html, {url:'http://localhost:8317/logs', runScripts:'outside-only'});
   t.after(() => dom.window.close());
@@ -90,21 +90,29 @@ test('Tool newline toggles are independent, reversible, and preserve original lo
   win.HTMLDialogElement.prototype.showModal = function () { this.open = true; };
   const entry = {name:'v1-responses-2026-09-03T100000-first.log',id:'first',time:'2026-09-03T10:00:00Z',method:'POST',url:'/v1/responses',model:'test',transport:'HTTP',status:200,duration:1,size:1000};
   const second = {...entry, name:'v1-responses-2026-09-03T100000-second.log', id:'second'};
-  const args = {code:'first\r\nsecond\nthird\rfourth',path:String.raw`C:\new\report.txt`,literal:String.raw`\n`,html:'<script>unsafe()</script>'};
+  const args = {
+    code:'first\r\nsecond\nthird\rfourth',
+    source:'def run(args):\n\tclr.AddReference("PresentationFramework")\n\tprint("\\n")',
+    path:String.raw`C:\new\report.txt`,literal:String.raw`\n`,html:'<script>unsafe()</script>'
+  };
   const originalArgs = JSON.stringify(args, null, 2);
   const renderedArgs = [
-    '{', '  "code": "first', 'second', 'third', 'fourth",',
-    String.raw`  "path": "C:\\new\\report.txt",`,
-    String.raw`  "literal": "\\n",`,
-    '  "html": "<script>unsafe()</script>"', '}'
+    '{', '  "code": @"first', 'second', 'third', 'fourth",',
+    '  "source": @"def run(args):', '\tclr.AddReference("PresentationFramework")', '\tprint("\\n")",',
+    String.raw`  "path": @"C:\new\report.txt",`,
+    String.raw`  "literal": @"\n",`,
+    '  "html": @"<script>unsafe()</script>"', '}'
   ].join('\n');
-  const output = String.raw`first\r\nsecond\nthird\rfourth\nC:\\new\\report.txt\n<script>unsafe()</script>` + '\nalready\nsplit';
-  const renderedOutput = ['first','second','third','fourth',String.raw`C:\\new\\report.txt`,'<script>unsafe()</script>','already','split'].join('\n');
+  const output = String.raw`first\r\nsecond\nthird\rfourth\nclr.AddReference(\"PresentationFramework\")\t\u263A \uD83D\uDE80\nC:\\new\\report.txt\n\\n \x41 \uZZZZ \/\n\u003Cscript>unsafe()\u003C/script>` + '\nalready\nsplit';
+  const renderedOutput = ['@"first','second','third','fourth','clr.AddReference("PresentationFramework")\t☺ 🚀',String.raw`C:\new\report.txt`,String.raw`\n \x41 \uZZZZ /`,'<script>unsafe()</script>','already','split"'].join('\n');
+  const jsonOutput = String.raw`{"quote\"key":["say \"hi\"",{"path":"C:\\new\\report.txt","literal":"\\n"}],"large":9007199254740993,"fraction":1.00,"boolean":false,"nil":null}`;
+  const renderedJSON = String.raw`{"quote\"key":[@"say "hi"",{"path":@"C:\new\report.txt","literal":@"\n"}],"large":9007199254740993,"fraction":1.00,"boolean":false,"nil":null}`;
   const longArgs = 'x'.repeat(12001) + String.raw`\nend`;
   const sections = [{name:'REQUEST BODY',text:JSON.stringify({input:[
     {role:'user',content:String.raw`user\ntext`},
     {type:'function_call',name:'run',arguments:JSON.stringify(args),call_id:'c1'},
     {type:'function_call_output',call_id:'c1',output},
+    {type:'function_call_output',call_id:'c1',output:jsonOutput},
     {type:'function_call',name:'long',arguments:longArgs,call_id:'c2'},
     {type:'function_call_output',call_id:'c2',output:[{type:'input_image',image_url:'data:image/png;base64,aGVsbG8='}]}
   ]})}];
@@ -116,13 +124,15 @@ test('Tool newline toggles are independent, reversible, and preserve original lo
   doc.querySelector('#entries button').click();
   await nextTurn();
   let [call, longCall] = doc.querySelectorAll('.message.tool-call');
-  let result = doc.querySelector('.message.tool');
-  assert.equal(doc.querySelectorAll('.newline-toggle input').length, 3);
-  assert.ok([...doc.querySelectorAll('.newline-toggle input')].every(toggle => !toggle.checked));
+  let [result, jsonResult] = doc.querySelectorAll('.message.tool');
+  assert.equal(doc.querySelectorAll('.unescape-toggle input').length, 4);
+  assert.ok([...doc.querySelectorAll('.unescape-toggle input')].every(toggle => !toggle.checked));
+  assert.ok([...doc.querySelectorAll('.unescape-toggle')].every(label => label.textContent === 'Render unescaped'));
   assert.equal(doc.querySelector('.message.user input'), null);
   assert.equal(doc.querySelector('.chat-image').closest('.message').querySelector('input'), null);
   assert.equal(call.querySelector('pre').textContent, originalArgs);
   assert.equal(result.querySelector('pre').textContent, output);
+  assert.equal(jsonResult.querySelector('pre').textContent, jsonOutput);
 
   call.querySelector('label').click();
   assert.equal(call.querySelector('pre').textContent, renderedArgs);
@@ -131,12 +141,16 @@ test('Tool newline toggles are independent, reversible, and preserve original lo
   assert.equal(longCall.querySelector('input').checked, false);
   result.querySelector('input').click();
   assert.equal(result.querySelector('pre').textContent, renderedOutput);
+  jsonResult.querySelector('input').click();
+  assert.equal(jsonResult.querySelector('pre').textContent, renderedJSON);
   assert.equal(call.querySelector('script'), null);
   assert.equal(result.querySelector('script'), null);
   call.querySelector('input').click();
   result.querySelector('input').click();
+  jsonResult.querySelector('input').click();
   assert.equal(call.querySelector('pre').textContent, originalArgs);
   assert.equal(result.querySelector('pre').textContent, output);
+  assert.equal(jsonResult.querySelector('pre').textContent, jsonOutput);
 
   // A toggle set before expansion applies when the deferred payload is rendered.
   longCall.querySelector('input').click();
@@ -144,7 +158,7 @@ test('Tool newline toggles are independent, reversible, and preserve original lo
   const fold = longCall.querySelector('details');
   fold.open = true;
   fold.dispatchEvent(new win.Event('toggle'));
-  assert.equal(longCall.querySelector('pre').textContent, 'x'.repeat(12001) + '\nend');
+  assert.equal(longCall.querySelector('pre').textContent, '@"' + 'x'.repeat(12001) + '\nend"');
   longCall.querySelector('input').click();
   assert.equal(longCall.querySelector('pre').textContent, longArgs);
 
@@ -161,7 +175,7 @@ test('Tool newline toggles are independent, reversible, and preserve original lo
   assert.equal(result.querySelector('pre').textContent, output);
   doc.querySelectorAll('#entries button')[1].click();
   await nextTurn();
-  assert.ok([...doc.querySelectorAll('.newline-toggle input')].every(toggle => !toggle.checked));
+  assert.ok([...doc.querySelectorAll('.unescape-toggle input')].every(toggle => !toggle.checked));
   assert.equal(doc.querySelector('.message.tool-call pre').textContent, originalArgs);
 });
 

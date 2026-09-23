@@ -47,11 +47,11 @@ body:has(dialog[open]) { overflow: hidden; }
 .message .call-id { margin: 0; color: #65738a; font-size: .75rem; word-break: break-all; text-align: right; }
 .message.tool-call .call-id { color: #a9bbd4; }
 .message.tool .message-header, .message.tool-call .message-header { flex-wrap: wrap; }
-.newline-toggle {
+.unescape-toggle {
   display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
   font-size: .75rem; white-space: nowrap; cursor: pointer;
 }
-.newline-toggle input {
+.unescape-toggle input {
   min-width: 0; width: 14px; height: 14px; padding: 0; margin: 0;
   flex-shrink: 0; accent-color: var(--primary); cursor: pointer;
 }

@@ -14,9 +14,13 @@ after updating its source.
   Role-colored message cards align users and client tool results to the right,
   assistants and tool calls to the left, and instruction blocks across the full
   width. Tool calls/results retain literal payload formatting. Each text payload
-  has a **Render newlines** checkbox beside its call ID to display escaped `\r`,
-  `\n`, and `\r\n` as line breaks. It starts off, preserves escaped backslashes,
-  and keeps its setting across view changes until another log is opened. Long
+  has a **Render unescaped** checkbox beside its call ID to decode one layer of
+  JSON string escapes, including line breaks, quotes, tabs, backslashes, and Unicode.
+  Decoded string values are marked with `@"…"`, for example
+  `"source": @"clr.AddReference("PresentationFramework")"`. This is a readable
+  display, not valid JSON. JSON keys and structure stay intact; plain-text payloads
+  are decoded as a single string, preserving unknown escapes. The checkbox starts
+  off and keeps its setting across view changes until another log is opened. Long
   content is rendered on expansion. Structured image attachments in Responses,
   Anthropic, Chat Completions, and Gemini content render inline, including Responses
   image-generation results and images in tool results. Images API logs render
