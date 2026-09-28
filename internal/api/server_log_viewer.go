@@ -3,8 +3,8 @@ package api
 import (
 	"path/filepath"
 
-	"github.com/router-for-me/CLIProxyAPI/v7/internal/api/handlers/logviewer"
-	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/api/handlers/logviewer"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
 )
 
 func (s *Server) setupLogViewerRoutes() {
