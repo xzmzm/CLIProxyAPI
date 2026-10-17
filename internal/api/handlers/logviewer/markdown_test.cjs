@@ -198,7 +198,7 @@ test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with 
     {name:'API ERROR RESPONSE',text:'HTTP Status: 429\nquota\n'},
     {name:'API REQUEST 2',text:'POST retry\n'},
     {name:'API RESPONSE 2',text:'Status: 200\n\nupstream-result\n'},
-    {name:'RESPONSE',text:'Status: 200\n\n'+JSON.stringify({output:[{role:'assistant',content:'# Answer\n\n- One\n- Two\n\n```js\nconst safe = true;\n```'}]})}
+    {name:'RESPONSE',text:'Status: 200\n\n'+JSON.stringify({output:[{role:'assistant',reasoning:'**Synthetic reasoning**',content:'# Answer\n\n- One\n- Two\n\n```js\nconst safe = true;\n```'}]})}
   ];
   win.fetch = async url => ({ok:true,json:async () => String(url).includes('?') ? {entries:[entry],page:1,pages:1,total:1} : {entry,sections}});
   for (const file of ['vendor/marked.umd.js','vendor/purify.min.js','parser.js','markdown.js','viewer.js']) {
@@ -220,6 +220,13 @@ test('Viewer renders Markdown chat and separates API/Proxy in Tree and Raw with 
   assert.equal(externalFigure.querySelector('img').referrerPolicy, 'no-referrer');
   assert.equal(doc.querySelector('.message.assistant h1').textContent, 'Answer');
   assert.equal(doc.querySelectorAll('.message.assistant li').length, 2);
+  const reasoning = doc.querySelector('.message.reasoning');
+  assert.equal(reasoning.querySelector('h3').textContent, 'Reasoning');
+  assert.equal(reasoning.querySelector('.markdown-body'), null);
+  const reasoningFold = reasoning.querySelector('details');
+  reasoningFold.open = true;
+  reasoningFold.dispatchEvent(new win.Event('toggle'));
+  assert.equal(reasoning.querySelector('strong').textContent, 'Synthetic reasoning');
   assert.match(doc.querySelector('.tool-payload').textContent, /# literal/);
   assert.equal(doc.querySelector('.tool-call .markdown-body'), null);
   doc.querySelector('#tab-tree').click();

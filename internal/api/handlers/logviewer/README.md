@@ -11,6 +11,9 @@ after updating its source.
   Search matches the filename, which contains the endpoint, timestamp, and request ID.
 - **Chat** renders Markdown in messages, instructions, reasoning, and tool descriptions:
   headings, lists, emphasis, tables, blockquotes, task lists, links, and fenced code.
+  Chat Completions reasoning supports both `reasoning_content` and `reasoning`,
+  including streamed fragments and retained request history. Reasoning cards are
+  collapsed by default; expand the card to read its content.
   Role-colored message cards align users and client tool results to the right,
   assistants and tool calls to the left, and instruction blocks across the full
   width. Tool calls/results retain literal payload formatting. Each text payload

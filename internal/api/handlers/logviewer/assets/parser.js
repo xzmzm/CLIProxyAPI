@@ -148,7 +148,9 @@
           if (Array.isArray(target.message.content)) target.message.content.push({type:'text', text:delta.content});
           else target.message.content += delta.content;
         }
-        if (delta.reasoning_content) target.message.reasoning_content = (target.message.reasoning_content || '') + delta.reasoning_content;
+        for (const field of ['reasoning_content', 'reasoning']) {
+          if (typeof delta[field] === 'string') target.message[field] = (target.message[field] || '') + delta[field];
+        }
         for (const tool of delta.tool_calls || []) {
           target.message.tool_calls ||= [];
           const t = target.message.tool_calls[tool.index ?? 0] ||= {id:tool.id, type:'function', function:{name:'', arguments:''}};
@@ -245,6 +247,9 @@
       if (Array.isArray(value)) { value.forEach(v => item(v, role)); return; }
       role = value.role || role;
       if (role === 'model') role = 'assistant';
+      // Compatible Chat providers use either field for the same visible text.
+      // Prefer one copy when a gateway returns both aliases.
+      const reasoning = value.reasoning_content || value.reasoning;
       if (value.type === 'function_call' || value.type === 'tool_use' || value.functionCall) {
         const tool = value.functionCall || value;
         add('tool-call', json(tool.arguments) ?? tool.arguments ?? tool.input ?? tool.args ?? '', 'Tool call · ' + (tool.name || 'function'), tool.call_id || tool.id);
@@ -266,10 +271,10 @@
         else add('tool', value, 'Tool result');
       } else if (value.content != null || value.parts != null) {
         item(value.content ?? value.parts, role);
-      } else if (!value.tool_calls && !value.reasoning_content) {
+      } else if (!value.tool_calls && !reasoning) {
         add(role, value, value.type || role);
       }
-      if (value.reasoning_content) add('reasoning', value.reasoning_content, 'Reasoning');
+      if (reasoning) add('reasoning', reasoning, 'Reasoning');
       for (const call of value.tool_calls || []) {
         if (call) add('tool-call', json(call.function?.arguments) ?? call.function?.arguments ?? call, 'Tool call · ' + (call.function?.name || 'function'), call.id);
       }

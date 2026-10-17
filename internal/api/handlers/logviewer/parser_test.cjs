@@ -38,6 +38,31 @@ test('Chat Completions deltas and tool argument fragments', () => {
   assert.equal(response.choices[0].message.content,'Hi there');
   assert.equal(response.choices[0].message.tool_calls[0].function.arguments,'{"x":1}');
 });
+test('Chat reasoning aliases render in response and retained request history without duplication', () => {
+  for (const field of ['reasoning', 'reasoning_content']) {
+    const message = {role:'assistant', content:null, [field]:'Synthetic reasoning',
+      tool_calls:[{id:'c1',function:{name:'inspect',arguments:'{}'}}]};
+    const before = JSON.stringify(message);
+    for (const payload of [{choices:[{message}]}, {messages:[message]}]) {
+      const chat = messages(payload);
+      assert.deepEqual(chat.map(m => m.role), ['reasoning','tool-call']);
+      assert.equal(chat[0].text, 'Synthetic reasoning');
+      assert.equal(chat[1].id, 'c1');
+    }
+    assert.equal(JSON.stringify(message), before);
+  }
+  assert.deepEqual(messages({choices:[{message:{role:'assistant',reasoning:'Same',reasoning_content:'Same'}}]}).map(m => m.text), ['Same']);
+});
+test('Chat streams retain reasoning fragments separately for each choice', () => {
+  for (const field of ['reasoning', 'reasoning_content']) {
+    const parsed = parse([{name:'RESPONSE',text:'Status: 200\n\n' + [
+      {choices:[{index:0,delta:{[field]:'First '}},{index:1,delta:{[field]:'Other'}}]},
+      {choices:[{index:0,delta:{[field]:'thought',content:'Answer'},finish_reason:'stop'}]}
+    ].map(e => 'data: ' + JSON.stringify(e) + '\n\n').join('') + 'data: [DONE]\n\n'}]);
+    assert.deepEqual(parsed.chat.filter(m => m.role === 'reasoning').map(m => m.text), ['First thought','Other']);
+    assert.equal(parsed.chat.filter(m => m.role === 'assistant')[0].text, 'Answer');
+  }
+});
 test('Anthropic text, thinking, and tool input deltas', () => {
   const response = consolidate([{type:'message_start',message:{role:'assistant'}},{type:'content_block_start',index:0,content_block:{type:'text',text:''}},{type:'content_block_delta',index:0,delta:{text:'Hello'}},{type:'content_block_start',index:1,content_block:{type:'tool_use',name:'run',id:'t1',input:{}}},{type:'content_block_delta',index:1,delta:{partial_json:'{"x":1}'}}]);
   const chat = messages(response);
