@@ -116,7 +116,7 @@ func TestCodexExecutorCacheHelper_UsesGenericSessionHeaderAcrossFormats(t *testi
 				Model:   "gpt-5.6-sol",
 				Payload: []byte(`{"model":"gpt-5.6-sol","input":"hello"}`),
 			}
-			httpReq, body, _, err := executor.cacheHelper(context.Background(), from, "https://example.com/responses", nil, req, req.Payload, []byte(`{"model":"gpt-5.6-sol","stream":true}`), headers)
+			httpReq, body, err := executor.cacheHelper(context.Background(), from, "https://example.com/responses", req, []byte(`{"model":"gpt-5.6-sol","stream":true}`), headers)
 			if err != nil {
 				t.Fatalf("cacheHelper error: %v", err)
 			}
